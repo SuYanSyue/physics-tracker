@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v7.0 (終極分析版)</title>
+    <title>物理實驗分析平台 v7.1 (物理正名版)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
     <style>
@@ -72,7 +72,7 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v7.0</div>
+    <div class="version-badge">v7.1</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -178,22 +178,23 @@
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartVXT"></canvas></div>
                 <div id="reg-vxt" class="reg-eq">需至少 3 點</div>
-                <div class="reg-note">⚠️ 微分運算會放大手震誤差，精確速度請看位移圖擬合。</div>
+                <div class="reg-note">💡 提示：v-t 圖斜率為加速度，常數項為初速。<br>數值微分會放大手震，精確值請參考位移圖擬合。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartVYT"></canvas></div>
                 <div id="reg-vyt" class="reg-eq">需至少 3 點</div>
-                <div class="reg-note">⚠️ 微分運算會放大手震誤差，精確速度請看位移圖擬合。</div>
+                <div class="reg-note">💡 提示：v-t 圖斜率為加速度，常數項為初速。<br>數值微分會放大手震，精確值請參考位移圖擬合。</div>
             </div>
+            
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAXT"></canvas></div>
                 <div id="reg-axt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次多項式」。</div>
+                <div class="reg-note">💡 提示：a-t 圖常數項為平均加速度。<br>二次微分雜訊大，精確值請將位移圖設為「二次多項式」。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAYT"></canvas></div>
                 <div id="reg-ayt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次多項式」。</div>
+                <div class="reg-note">💡 提示：a-t 圖常數項為平均加速度。<br>二次微分雜訊大，精確值請將位移圖設為「二次多項式」。</div>
             </div>
         </div>
     </div>
@@ -514,10 +515,10 @@
     function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
     function clearPoints() { if (isScreenLocked) { alert("請先解除鎖定才能清除資料！"); return; } if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
 
-    /* ================= 4. v7.0: 終極回歸演算法 (使用 regression.js) ================= */
+    /* ================= 4. v7.1: 統計回歸與物理正名系統 ================= */
     
     function initCharts() {
-        const createChart = (id, title) => {
+        const createChart = (id) => {
             return new Chart(document.getElementById(id).getContext('2d'), {
                 type: 'scatter',
                 data: { datasets: [
@@ -594,10 +595,9 @@
                 chart.update(); return;
             }
 
-            // 準備 regression.js 格式的資料
             let dataPairs = [];
             for (let i = 0; i < tData.length; i++) {
-                if (fitMode === 'logarithmic' && tData[i] <= 0) continue; // 對數不能有小於等於0的輸入
+                if (fitMode === 'logarithmic' && tData[i] <= 0) continue; 
                 dataPairs.push([tData[i], yData[i]]);
             }
 
@@ -606,7 +606,6 @@
                 chart.update(); return;
             }
 
-            // 防雜訊震盪：設定圖表顯示的最小範圍
             let minSpan = currentUnit === 'm' ? 0.1 : 10;
             if (!isPosChart) minSpan = eqElementId.includes('v') ? (currentUnit === 'm' ? 0.5 : 50) : (currentUnit === 'm' ? 2 : 200);
             let maxAbs = Math.max(...yData.map(Math.abs));
@@ -616,7 +615,6 @@
 
             chart.data.datasets[0].data = tData.map((timeVal, idx) => ({ x: timeVal, y: yData[idx] }));
 
-            // 呼叫 regression.js 進行計算
             const opts = { precision: 5 };
             let result;
             try {
@@ -627,13 +625,12 @@
                 else if (fitMode === 'logarithmic') result = regression.logarithmic(dataPairs, opts);
             } catch(e) { result = null; }
 
-            // 防呆：如果擬合失敗 (例如數值為負導致對數或指數爆炸)
             if (!result || isNaN(result.equation[0])) {
                 document.getElementById(eqElementId).innerHTML = `<span style="color:#e74c3c;">該數學模型不適用此數據<br>(可能存在負值或零)</span>`;
                 chart.data.datasets[1].data = []; chart.update(); return;
             }
 
-            // 教育級防護網：自己計算 R2，保留「極小波動強制歸零」的防呆設計
+            // 自己計算 R2 防雜訊
             let yMean = yData.reduce((a,b)=>a+b, 0) / yData.length;
             let ssTot = 0, ssRes = 0;
             for(let i=0; i<tData.length; i++) {
@@ -645,7 +642,6 @@
             if (ssTot > 1e-8) { r2 = 1 - (ssRes / ssTot); }
             r2 = Math.max(0, Math.min(1, r2));
 
-            // 產生圓滑的趨勢線
             let trendData = [];
             if (dataPairs.length > 0) {
                 let tStart = tData[0], tEnd = tData[tData.length - 1], steps = 50;
@@ -656,16 +652,30 @@
                 }
             }
 
-            // 格式化方程式文字
             let eqText = result.string.replace(/y =/g, `${depVar} =`).replace(/x/g, 't');
             eqText += ` &nbsp;|&nbsp; R² = ${r2.toFixed(4)}`;
             
-            if (fitMode === 'linear') {
-                eqText += `<br>斜率 (速度) = <span style="color:#2980b9;font-size:16px;">${result.equation[0]}</span>`;
-            } else if (fitMode === 'quad') {
-                let accel = (result.equation[0] * 2).toFixed(4); // 二次項係數 x 2 = 加速度
-                eqText += `<br>等加速度 (2A) = <span style="color:#2980b9;font-size:16px;">${accel}</span> ${unitStr}/s`;
+            // v7.1 核心：依據不同物理圖表與擬合模式給予精準的正名
+            let physicalMeaning = "";
+            
+            if (isPosChart) { // x-t 或 y-t 圖
+                if (fitMode === 'linear') {
+                    physicalMeaning = `等速度 (斜率) = <span style="color:#2980b9;font-size:16px;">${result.equation[0].toFixed(3)}</span> ${unitStr}/s`;
+                } else if (fitMode === 'quad') {
+                    let accel = (result.equation[0] * 2).toFixed(3); 
+                    physicalMeaning = `等加速度 (2A) = <span style="color:#2980b9;font-size:16px;">${accel}</span> ${unitStr}/s²`;
+                }
+            } else if (eqElementId.includes('v')) { // v-t 圖
+                if (fitMode === 'linear') {
+                    physicalMeaning = `加速度 (斜率) = <span style="color:#2980b9;font-size:16px;">${result.equation[0].toFixed(3)}</span> ${currentUnit}/s²<br>初速度 (常數) = ${result.equation[1].toFixed(3)} ${currentUnit}/s`;
+                }
+            } else if (eqElementId.includes('a')) { // a-t 圖
+                if (fitMode === 'linear') {
+                    physicalMeaning = `平均加速度 (常數) = <span style="color:#2980b9;font-size:16px;">${result.equation[1].toFixed(3)}</span> ${currentUnit}/s²`;
+                }
             }
+
+            if (physicalMeaning !== "") { eqText += `<br>${physicalMeaning}`; }
 
             chart.data.datasets[1].data = trendData;
             chart.data.datasets[1].tension = (fitMode === 'linear') ? 0 : 0.4;
@@ -679,7 +689,6 @@
         updateChartWithRegression(chartInstances.xt, t, x, 'reg-xt', 'X 位置', fitX, 'x', true);
         updateChartWithRegression(chartInstances.yt, t, y, 'reg-yt', 'Y 位置', fitY, 'y', true);
         
-        // 速度與加速度固定使用線性擬合，作為輔助參考
         updateChartWithRegression(chartInstances.vxt, t.slice(1,-1), vx.slice(1,-1), 'reg-vxt', '速度 v<sub>x</sub>', 'linear', 'v<sub>x</sub>', false);
         updateChartWithRegression(chartInstances.vyt, t.slice(1,-1), vy.slice(1,-1), 'reg-vyt', '速度 v<sub>y</sub>', 'linear', 'v<sub>y</sub>', false);
         updateChartWithRegression(chartInstances.axt, t.slice(2,-2), ax.slice(2,-2), 'reg-axt', '加速度 a<sub>x</sub>', 'linear', 'a<sub>x</sub>', false);
