@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v6.2</title>
+    <title>物理實驗分析平台 v6.3</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
@@ -65,15 +65,13 @@
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; background: #f8f9fa; padding: 4px 8px; border-radius: 4px; border: 1px solid #eee; }
         .canvas-container { flex-grow: 1; position: relative; }
         .reg-eq { font-family: monospace; font-size: 13px; color: #d35400; margin-top: 8px; text-align: center; font-weight: bold; background: #fdf2e9; padding: 6px; border-radius: 4px; flex-shrink: 0; }
-        
-        /* v6.2: 針對速度與加速度圖表的教育意義警語 */
         .reg-note { font-size: 11.5px; color: #7f8c8d; text-align: center; margin-top: 6px; line-height: 1.3; }
     </style>
 </head>
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v6.2</div>
+    <div class="version-badge">v6.3</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -150,8 +148,8 @@
                 <div class="chart-header">
                     <span style="font-size: 13px; font-weight: bold; color: var(--primary);">x-t 圖 (X 軸位移)</span>
                     <select id="fit-xt-select" onchange="syncCharts()" style="font-size: 12px; padding: 2px; border-radius: 4px;">
-                        <option value="linear">線性擬合 (等速)</option>
-                        <option value="quad" selected>二次擬合 (等加速)</option>
+                        <option value="linear" selected>線性擬合 (等速)</option>
+                        <option value="quad">二次擬合 (等加速)</option>
                     </select>
                 </div>
                 <div class="canvas-container"><canvas id="chartXT"></canvas></div>
@@ -173,22 +171,22 @@
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartVXT"></canvas></div>
                 <div id="reg-vxt" class="reg-eq">需至少 3 點</div>
-                <div class="reg-note">⚠️ 微分運算會放大手震誤差(如打點計時器)，精確速度請參考位移圖擬合。</div>
+                <div class="reg-note">⚠️ 微分運算會放大手震誤差，精確速度請看位移圖擬合。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartVYT"></canvas></div>
                 <div id="reg-vyt" class="reg-eq">需至少 3 點</div>
-                <div class="reg-note">⚠️ 微分運算會放大手震誤差(如打點計時器)，精確速度請參考位移圖擬合。</div>
+                <div class="reg-note">⚠️ 微分運算會放大手震誤差，精確速度請看位移圖擬合。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAXT"></canvas></div>
                 <div id="reg-axt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊大，精確加速度請將位移圖設為「二次擬合」直接計算。</div>
+                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次擬合」。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAYT"></canvas></div>
                 <div id="reg-ayt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊大，精確加速度請將位移圖設為「二次擬合」直接計算。</div>
+                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次擬合」。</div>
             </div>
         </div>
     </div>
@@ -509,7 +507,7 @@
     function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
     function clearPoints() { if (isScreenLocked) { alert("請先解除鎖定才能清除資料！"); return; } if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
 
-    /* ================= 4. v6.2: 變數正名與 R2 升級 ================= */
+    /* ================= 4. v6.3: R2 雜訊防呆處理與正名 ================= */
     
     function linearRegression(xData, yData) {
         let n = xData.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
@@ -522,7 +520,11 @@
             let y_pred = slope * xData[i] + intercept;
             ss_tot += Math.pow(yData[i] - y_mean, 2); ss_res += Math.pow(yData[i] - y_pred, 2);
         }
-        return { m: slope, c: intercept, r2: 1 - (ss_res / ss_tot) || 0 };
+        // 雜訊濾波閘門：若總變異極小，強制 R2 為 0，避免數學雜訊擬合
+        let r2 = 0;
+        if (ss_tot > 1e-8) { r2 = 1 - (ss_res / ss_tot); }
+        r2 = Math.max(0, Math.min(1, r2)); // 防止極微小的浮點數負值
+        return { m: slope, c: intercept, r2: r2 };
     }
 
     function quadraticRegression(xData, yData) {
@@ -545,7 +547,10 @@
             let yPred = A*xData[i]*xData[i] + B*xData[i] + C;
             ssTot += Math.pow(yData[i] - yMean, 2); ssRes += Math.pow(yData[i] - yPred, 2);
         }
-        return { A, B, C, r2: 1 - (ssRes/ssTot) };
+        let r2 = 0;
+        if (ssTot > 1e-8) { r2 = 1 - (ssRes / ssTot); }
+        r2 = Math.max(0, Math.min(1, r2));
+        return { A, B, C, r2: r2 };
     }
 
     function initCharts() {
@@ -617,7 +622,6 @@
     function syncCharts() {
         const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
         
-        // v6.2：參數新增 depVar (方程式自變數的物理符號)
         const updatePosChart = (chart, tData, yData, eqElementId, labelPrefix, fitMode, depVar) => {
             chart.options.scales.y.title.text = `${labelPrefix} (${currentUnit})`;
             const minPts = fitMode === 'linear' ? 2 : 3;
@@ -654,7 +658,6 @@
                     }
                 }
                 let accel = (reg.A * 2).toFixed(3);
-                // v6.2: 補上 R2 決定係數
                 eqText = `${depVar} = ${reg.A.toFixed(3)}t² ${reg.B >= 0 ? '+' : ''}${reg.B.toFixed(3)}t ${reg.C >= 0 ? '+' : ''}${reg.C.toFixed(3)} &nbsp;|&nbsp; R² = ${reg.r2.toFixed(4)}<br>等加速度 = <span style="color:#2980b9;font-size:16px;">${accel}</span> ${currentUnit}/s²`;
                 chart.data.datasets[1].tension = 0.4;
             }
@@ -688,7 +691,6 @@
             chart.data.datasets[0].data = tData.map((timeVal, idx) => ({ x: timeVal, y: yData[idx] }));
             const reg = linearRegression(tData, yData);
             chart.data.datasets[1].data = tData.map(timeVal => ({ x: timeVal, y: reg.m * timeVal + reg.c }));
-            // v6.2: 採用精準的物理代號取代 y = mx+c
             document.getElementById(eqElementId).innerHTML = `${depVar} = ${reg.m.toFixed(3)}t ${reg.c >= 0 ? '+' : ''} ${reg.c.toFixed(3)} &nbsp;|&nbsp; R² = ${reg.r2.toFixed(4)}`;
             chart.update();
         };
@@ -696,7 +698,6 @@
         const fitX = document.getElementById('fit-xt-select').value;
         const fitY = document.getElementById('fit-yt-select').value;
 
-        // 呼叫時帶入物理代號：x, y, v_x, v_y, a_x, a_y (支援 HTML 下標顯示)
         updatePosChart(chartInstances.xt, t, x, 'reg-xt', 'X 位置', fitX, 'x');
         updatePosChart(chartInstances.yt, t, y, 'reg-yt', 'Y 位置', fitY, 'y');
         updateLinearChart(chartInstances.vxt, t.slice(1,-1), vx.slice(1,-1), 'reg-vxt', 3, '速度 v<sub>x</sub>', 'v<sub>x</sub>');
