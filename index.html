@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>物理實驗分析平台 - 慢動作支援版</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
+        
+        /* 全域設定 */
+        body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
+        body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
+        
+        /* 吸頂標籤列 */
+        .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
+        .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
+        
+        /* 影片工作區 */
+        #workspace-container { flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; }
+        /* 第三步時：佔據螢幕 80% 高度，方便縱向與橫向擁有最大視野 */
+        body.step3-active #workspace-container { height: 80vh; flex: none; border-bottom: 3px solid #bdc3c7; }
+        
+        video, canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
+        canvas { z-index: 10; cursor: crosshair; }
+
+        /* 播放器控制列 */
+        .player-bar { display: none; align-items: center; padding: 10px 15px; background: #fff; border-bottom: 1px solid #ddd; gap: 10px; height: 45px; box-sizing: border-box; }
+        body.step3-active .player-bar { display: none !important; }
+        
+        .controls-btn { display: flex; gap: 5px; }
+        .icon-btn { background: var(--primary); color: white; border: none; border-radius: 4px; width: 38px; height: 38px; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+        .icon-btn:active { transform: scale(0.92); background: var(--active); }
+        .timeline-container { flex-grow: 1; display: flex; align-items: center; gap: 10px; }
+        input[type="range"] { width: 100%; height: 6px; cursor: pointer; }
+        .time-display { font-family: monospace; font-size: 15px; width: 65px; text-align: right; font-weight: bold; color: var(--primary); }
+
+        /* 控制面板區 */
+        .panel { background: white; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
+        body.step3-active .panel { background: transparent; box-shadow: none; padding-bottom: 40px; }
+        
+        .panel-content { display: none; padding: 12px 15px; }
+        .panel-content.active { display: block; }
+        
+        /* 按鈕與標籤設計 */
+        .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
+        .action-btn:active { transform: translateY(1px); }
+        .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
+        .action-btn.success { background: #27ae60; }
+        .action-btn.danger { background: #e74c3c; }
+        .action-btn.warning { background: #f39c12; }
+        .action-btn.export { background: #8e44ad; } 
+        
+        select.action-btn { -webkit-appearance: none; text-align: center; font-size: 14px; }
+
+        .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #2c3e50; padding: 10px; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
+
+        /* 格線排版 */
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; }
+        
+        /* 第三步圖表區 */
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
+        @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
+        .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); min-height: 280px; display: flex; flex-direction: column; }
+        .canvas-container { flex-grow: 1; position: relative; min-height: 200px; }
+        .reg-eq { font-family: monospace; font-size: 13px; color: #d35400; margin-top: 8px; text-align: center; font-weight: bold; background: #fdf2e9; padding: 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 影片來源與比例尺</div>
+    <div class="tab" onclick="switchTab(2)" id="tab-2">2. 擷取區間</div>
+    <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與即時圖表</div>
+</div>
+
+<div id="workspace-container">
+    <video id="video" playsinline muted></video>
+    <canvas id="canvas"></canvas>
+</div>
+
+<div class="player-bar" id="player-bar">
+    <div class="controls-btn">
+        <button class="icon-btn" onclick="vidSeekToStart()">⏮</button>
+        <button class="icon-btn" onclick="vidStep(-1)">⏪</button>
+        <button class="icon-btn" onclick="vidTogglePlay()" id="btn-play">▶️</button>
+        <button class="icon-btn" onclick="vidStep(1)">⏩</button>
+        <button class="icon-btn" onclick="vidSeekToEnd()">⏭</button>
+    </div>
+    <div class="timeline-container">
+        <input type="range" id="seek-bar" min="0" max="100" value="0" step="0.001">
+        <div class="time-display" id="time-txt">0.000s</div>
+    </div>
+</div>
+
+<div class="panel" id="main-panel">
+    
+    <!-- Step 1 -->
+    <div class="panel-content active" id="panel-1">
+        <div class="grid-row">
+            <!-- 隱藏的 File Input，利用原生 iOS 行為 -->
+            <input type="file" id="file-upload" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
+            <button class="action-btn" onclick="document.getElementById('file-upload').click()">📂 匯入 / 📱 拍攝</button>
+            
+            <select id="fps-select" class="action-btn">
+                <option value="30">原始幀率: 30 fps</option>
+                <option value="60">原始幀率: 60 fps</option>
+                <option value="120">慢動作: 120 fps</option>
+                <option value="240">慢動作: 240 fps</option>
+            </select>
+            
+            <button class="action-btn warning" id="btn-calib" onclick="startCalibration()" disabled>📏 設定比例尺</button>
+            <div class="info-label" id="scale-txt" style="font-size:12px;">比例: 預設(1px=0.01m)</div>
+        </div>
+        <div style="text-align:center; font-size: 13px; color: #7f8c8d; margin-top: 8px;">
+            提示：在 iPad 上點擊「拍攝」，可開啟原生相機並切換至「慢動作」錄影。
+        </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="panel-content" id="panel-2">
+        <div class="grid-row">
+            <button class="action-btn" onclick="setMark('start')">設為起點畫格</button>
+            <div class="info-label" id="txt-start">未設定</div>
+            <button class="action-btn danger" onclick="setMark('end')">設為終點畫格</button>
+            <div class="info-label red" id="txt-end">未設定</div>
+        </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="panel-content" id="panel-3" style="padding: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-bottom: 1px solid #ddd; position: sticky; top: 45px; z-index: 99;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="track-count" style="font-weight: bold; font-size: 18px; color: var(--primary);">已標記: 0 點</span>
+                <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前進度: 第 1 幀</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">↩️ 復原</button>
+                <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">📥 CSV</button>
+                <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">🗑️ 清除</button>
+            </div>
+        </div>
+        
+        <div class="chart-grid">
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartXT"></canvas></div><div id="reg-xt" class="reg-eq">等待標記...</div></div>
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartYT"></canvas></div><div id="reg-yt" class="reg-eq">等待標記...</div></div>
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartVXT"></canvas></div><div id="reg-vxt" class="reg-eq">需至少 2 點計算速度</div></div>
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartVYT"></canvas></div><div id="reg-vyt" class="reg-eq">需至少 2 點計算速度</div></div>
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartAXT"></canvas></div><div id="reg-axt" class="reg-eq">需至少 3 點計算加速度</div></div>
+            <div class="chart-box"><div class="canvas-container"><canvas id="chartAYT"></canvas></div><div id="reg-ayt" class="reg-eq">需至少 3 點計算加速度</div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const seekBar = document.getElementById('seek-bar');
+    const timeTxt = document.getElementById('time-txt');
+    const playerBar = document.getElementById('player-bar');
+    const frameCountTxt = document.getElementById('frame-count');
+    
+    let startTime = 0, endTime = 999;
+    let isStartSet = false, isEndSet = false;
+    let trackPoints = []; 
+    let currentTab = 1;
+
+    let isDraggingSeekbar = false; 
+    let isPlaying = false;
+    let physicalScale = 0.01; 
+    let isCalibrating = false;
+    let calibPoints = [];
+    const HIT_RADIUS = 25; 
+
+    let chartInstances = {};
+
+    function resizeCanvas() {
+        if (!video.videoWidth) return;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        drawPoints();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function switchTab(step) {
+        currentTab = step;
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.panel-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-${step}`).classList.add('active');
+        document.getElementById(`panel-${step}`).classList.add('active');
+        
+        if (step === 3) {
+            document.body.classList.add('step3-active');
+            if (isStartSet) { video.currentTime = startTime; forceUpdateUI(); }
+        } else {
+            document.body.classList.remove('step3-active');
+            if (video.src) playerBar.style.display = 'flex';
+        }
+        setTimeout(resizeCanvas, 300);
+    }
+
+    /* ================= 1. 原生影片匯入與比例尺 ================= */
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+        video.src = url;
+
+        video.onloadedmetadata = () => {
+            playerBar.style.display = 'flex';
+            document.getElementById('btn-calib').disabled = false;
+            
+            startTime = 0;
+            endTime = video.duration || 100;
+            isStartSet = false; isEndSet = false;
+            document.getElementById('txt-start').innerText = "未設定";
+            document.getElementById('txt-end').innerText = "未設定";
+            
+            seekBar.min = 0;
+            seekBar.max = endTime;
+            resizeCanvas();
+            forceUpdateUI();
+        };
+    }
+
+    function startCalibration() {
+        if (!video.src) return;
+        isCalibrating = true; calibPoints = []; video.pause(); 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText("點擊畫面標記參考物的第一個端點", canvas.width/2, canvas.height/2);
+    }
+
+    /* ================= 2. 播放器與進度條 ================= */
+    function forceUpdateUI() {
+        seekBar.value = video.currentTime;
+        timeTxt.innerText = video.currentTime.toFixed(3) + "s";
+        updateFrameDisplay();
+    }
+
+    function updateFrameDisplay() {
+        if (currentTab === 3 && isStartSet) {
+            // 計算畫格時，假設播放幀率為 30
+            let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
+            let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
+            
+            let frameNum = Math.round((video.currentTime - startTime) * playbackFPS) + 1;
+            if (frameNum < 1) frameNum = 1;
+            frameCountTxt.innerText = `目前進度: 第 ${frameNum} 幀`;
+        }
+    }
+
+    video.addEventListener('timeupdate', () => { if (!isDraggingSeekbar) forceUpdateUI(); });
+    seekBar.addEventListener('pointerdown', () => isDraggingSeekbar = true);
+    seekBar.addEventListener('pointerup', () => isDraggingSeekbar = false);
+    seekBar.addEventListener('input', () => { video.currentTime = parseFloat(seekBar.value); timeTxt.innerText = video.currentTime.toFixed(3) + "s"; updateFrameDisplay(); });
+
+    function vidTogglePlay() {
+        if (video.paused) { video.play(); isPlaying = true; document.getElementById('btn-play').innerText = "⏸️"; }
+        else { video.pause(); isPlaying = false; document.getElementById('btn-play').innerText = "▶️"; }
+    }
+    
+    function vidStep(frames) { 
+        video.pause(); isPlaying = false; 
+        document.getElementById('btn-play').innerText = "▶️"; 
+        
+        // 智慧判斷步進時間：iPhone 慢動作(120/240)播放時預設為 30fps
+        let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
+        let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
+        
+        video.currentTime += frames * (1 / playbackFPS); 
+        forceUpdateUI(); 
+    }
+    
+    function vidSeekToStart() { video.currentTime = startTime; forceUpdateUI(); }
+    function vidSeekToEnd() { video.currentTime = endTime; forceUpdateUI(); }
+
+    function setMark(type) {
+        if (type === 'start') {
+            startTime = video.currentTime;
+            document.getElementById('txt-start').innerText = `${startTime.toFixed(3)}s`;
+            seekBar.min = startTime; isStartSet = true;
+        } else {
+            endTime = video.currentTime;
+            document.getElementById('txt-end').innerText = `${endTime.toFixed(3)}s`;
+            seekBar.max = endTime; isEndSet = true;
+        }
+        if (isStartSet && isEndSet) setTimeout(() => switchTab(3), 600);
+    }
+
+    /* ================= 3. 畫布點擊 ================= */
+    function getCanvasPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+        const pos = getCanvasPos(e);
+
+        if (isCalibrating) {
+            if (calibPoints.length === 0) ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            calibPoints.push(pos);
+            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
+            if (calibPoints.length === 2) {
+                ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.moveTo(calibPoints[0].x, calibPoints[0].y); ctx.lineTo(calibPoints[1].x, calibPoints[1].y); ctx.stroke();
+                setTimeout(() => {
+                    const pxDist = Math.hypot(calibPoints[1].x - calibPoints[0].x, calibPoints[1].y - calibPoints[0].y);
+                    const realDist = prompt("請輸入兩點之間的真實物理長度 (公尺):", "1.0");
+                    if (realDist && !isNaN(realDist)) {
+                        physicalScale = parseFloat(realDist) / pxDist;
+                        document.getElementById('scale-txt').innerText = `比例: 1px=${physicalScale.toFixed(4)}m`;
+                    }
+                    isCalibrating = false; ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }, 100);
+            }
+            return;
+        }
+
+        if (currentTab !== 3) return; 
+
+        const t = video.currentTime;
+        if (t > endTime || t < startTime) return;
+        
+        // 儲存影片時間，繪圖與 CSV 匯出時再轉換為真實物理時間
+        trackPoints.push({ time: t - startTime, px: pos.x, py: pos.y });
+        
+        updateTrackUI();
+        vidStep(1); 
+    });
+
+    function undoPoint() {
+        if (trackPoints.length > 0) { trackPoints.pop(); vidStep(-1); updateTrackUI(); }
+    }
+
+    function drawPoints() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (currentTab !== 3) return;
+
+        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+        trackPoints.forEach((p, i) => {
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.4)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(p.px, p.py, 5, 0, Math.PI*2); ctx.fill();
+            if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
+        });
+    }
+
+    function updateTrackUI() { 
+        document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; 
+        drawPoints(); syncCharts(); 
+    }
+
+    function clearPoints() { 
+        if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } 
+    }
+
+    /* ================= 4. 圖表與物理計算核心 ================= */
+    function linearRegression(x, y) {
+        let n = x.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
+        for (let i = 0; i < n; i++) { sum_x += x[i]; sum_y += y[i]; sum_xy += x[i]*y[i]; sum_xx += x[i]*x[i]; }
+        if(n * sum_xx - sum_x * sum_x === 0) return { m: 0, c: 0, r2: 0 }; 
+        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+        let intercept = (sum_y - slope * sum_x) / n;
+        let y_mean = sum_y / n, ss_tot = 0, ss_res = 0;
+        for (let i = 0; i < n; i++) {
+            let y_pred = slope * x[i] + intercept;
+            ss_tot += Math.pow(y[i] - y_mean, 2);
+            ss_res += Math.pow(y[i] - y_pred, 2);
+        }
+        return { m: slope, c: intercept, r2: 1 - (ss_res / ss_tot) || 0 };
+    }
+
+    function initCharts() {
+        const createChart = (id, title, yAxisLabel) => {
+            return new Chart(document.getElementById(id).getContext('2d'), {
+                type: 'scatter',
+                data: { datasets: [
+                    { label: '實驗數據', data: [], borderColor: '#3498db', backgroundColor: '#3498db', pointRadius: 4 },
+                    { label: '趨勢線', data: [], type: 'line', borderColor: '#e74c3c', borderWidth: 2, pointRadius: 0, fill: false }
+                ]},
+                options: { 
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: title, font: { size: 14 } }, legend: { display: false } },
+                    scales: { x: { type: 'linear', title: { display: true, text: '真實時間 t (s)' } }, y: { title: { display: true, text: yAxisLabel } } },
+                    animation: { duration: 0 } 
+                }
+            });
+        };
+
+        chartInstances.xt = createChart('chartXT', 'x-t 圖 (水平位移)', '位置 x (m)');
+        chartInstances.yt = createChart('chartYT', 'y-t 圖 (垂直位移)', '位置 y (m)');
+        chartInstances.vxt = createChart('chartVXT', 'vx-t 圖 (水平速度)', '速度 vx (m/s)');
+        chartInstances.vyt = createChart('chartVYT', 'vy-t 圖 (垂直速度)', '速度 vy (m/s)');
+        chartInstances.axt = createChart('chartAXT', 'ax-t 圖 (水平加速度)', '加速度 ax (m/s²)');
+        chartInstances.ayt = createChart('chartAYT', 'ay-t 圖 (垂直加速度)', '加速度 ay (m/s²)');
+    }
+    window.addEventListener('load', initCharts);
+
+    function getPhysicsData() {
+        let t=[], x=[], y=[], vx=[], vy=[], ax=[], ay=[];
+        
+        // 【核心演算法】校正慢動作影片的真實時間
+        let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
+        let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
+        let timeScale = playbackFPS / targetFPS; // 若拍攝240fps，播放30fps，則真實時間 = 影片時間 * (30/240)
+        
+        for (let i = 0; i < trackPoints.length; i++) {
+            let realTime = trackPoints[i].time * timeScale;
+            t.push(realTime); 
+            
+            x.push(trackPoints[i].px * physicalScale);
+            y.push((canvas.height - trackPoints[i].py) * physicalScale); 
+            
+            if (i === 0) {
+                vx.push(0); vy.push(0); ax.push(0); ay.push(0);
+            } else {
+                let dt = t[i] - t[i-1];
+                vx.push(dt > 0 ? (x[i] - x[i-1]) / dt : 0);
+                vy.push(dt > 0 ? (y[i] - y[i-1]) / dt : 0);
+                
+                if (i === 1) { ax.push(0); ay.push(0); } 
+                else {
+                    let dt_prev = t[i-1] - t[i-2];
+                    ax.push(dt > 0 ? (vx[i] - vx[i-1]) / dt : 0); 
+                    ay.push(dt > 0 ? (vy[i] - vy[i-1]) / dt : 0);
+                }
+            }
+        }
+        return { t, x, y, vx, vy, ax, ay };
+    }
+
+    function syncCharts() {
+        const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
+
+        const updateOneChart = (chart, tData, yData, eqElementId, minPoints) => {
+            if (tData.length < minPoints) {
+                chart.data.datasets[0].data = []; chart.data.datasets[1].data = [];
+                document.getElementById(eqElementId).innerText = `需至少 ${minPoints} 點`;
+                chart.update(); return;
+            }
+
+            chart.data.datasets[0].data = tData.map((timeVal, idx) => ({ x: timeVal, y: yData[idx] }));
+            const reg = linearRegression(tData, yData);
+            chart.data.datasets[1].data = tData.map(timeVal => ({ x: timeVal, y: reg.m * timeVal + reg.c }));
+            document.getElementById(eqElementId).innerHTML = `y = ${reg.m.toFixed(3)}x ${reg.c >= 0 ? '+' : ''} ${reg.c.toFixed(3)} | R² = ${reg.r2.toFixed(4)}`;
+            chart.update();
+        };
+
+        updateOneChart(chartInstances.xt, t, x, 'reg-xt', 2);
+        updateOneChart(chartInstances.yt, t, y, 'reg-yt', 2);
+        updateOneChart(chartInstances.vxt, t.slice(1), vx.slice(1), 'reg-vxt', 2);
+        updateOneChart(chartInstances.vyt, t.slice(1), vy.slice(1), 'reg-vyt', 2);
+        updateOneChart(chartInstances.axt, t.slice(2), ax.slice(2), 'reg-axt', 2);
+        updateOneChart(chartInstances.ayt, t.slice(2), ay.slice(2), 'reg-ayt', 2);
+    }
+
+    function exportCSV() {
+        if (trackPoints.length === 0) { alert("目前沒有數據可匯出！"); return; }
+        
+        const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "Point,Real Time (s),Pixel X,Pixel Y,Real X (m),Real Y (m),Vx (m/s),Vy (m/s),Ax (m/s2),Ay (m/s2)\n";
+
+        for (let i = 0; i < trackPoints.length; i++) {
+            let row = [
+                i + 1, t[i].toFixed(5), trackPoints[i].px.toFixed(1), trackPoints[i].py.toFixed(1),
+                x[i].toFixed(4), y[i].toFixed(4), vx[i].toFixed(4), vy[i].toFixed(4), ax[i].toFixed(4), ay[i].toFixed(4)
+            ];
+            csvContent += row.join(",") + "\n";
+        }
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "kinematics_data.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+
+</body>
+</html>
