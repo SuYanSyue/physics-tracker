@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v5.3</title>
+    <title>物理實驗分析平台 v5.4</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
@@ -61,7 +61,6 @@
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
         
-        /* v5.3: 圖表強制設定為 1:1 正方形 */
         .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); aspect-ratio: 1 / 1; display: flex; flex-direction: column; }
         .canvas-container { flex-grow: 1; position: relative; }
         .reg-eq { font-family: monospace; font-size: 13px; color: #d35400; margin-top: 8px; text-align: center; font-weight: bold; background: #fdf2e9; padding: 6px; border-radius: 4px; flex-shrink: 0; }
@@ -70,7 +69,7 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v5.3</div>
+    <div class="version-badge">v5.4</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -119,7 +118,6 @@
         <div class="grid-row" style="margin-top:0;">
             <button class="action-btn origin" id="btn-origin" onclick="setAppMode('AXES')" disabled>1. 設定座標系</button>
             <button class="action-btn warning" id="btn-calib" onclick="setAppMode('CALIB')" disabled>2. 設定比例尺</button>
-            <!-- v5.3: 新增單位切換按鈕 -->
             <button class="action-btn unit" id="btn-unit" onclick="toggleUnit()" disabled>📏 單位: 公尺 (m)</button>
             <label class="info-label"><input type="checkbox" id="chk-only-x" onchange="drawPoints()"> 僅沿x軸跑</label>
             <label class="info-label"><input type="checkbox" id="chk-only-y" onchange="drawPoints()"> 僅沿y軸跑</label>
@@ -171,7 +169,7 @@
     let currentTab = 1;
     let isDraggingSeekbar = false; 
     let isScreenLocked = false; 
-    let currentUnit = 'm'; // v5.3: 全域單位變數
+    let currentUnit = 'm'; 
 
     let physicalScale = 0.01; 
     let originX = null, originY = null;
@@ -230,7 +228,6 @@
         }
     }
 
-    // v5.3: 單位切換功能
     function toggleUnit() {
         if (currentUnit === 'm') {
             currentUnit = 'cm';
@@ -239,7 +236,7 @@
             currentUnit = 'm';
             document.getElementById('btn-unit').innerText = "📏 單位: 公尺 (m)";
         }
-        syncCharts(); // 單位改變時立刻重繪圖表
+        syncCharts(); 
     }
 
     function handleFileUpload(event) {
@@ -343,10 +340,14 @@
         return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
     }
 
+    // v5.4: 加大放大鏡面積，避免手指遮擋
     function drawLoupe(ctx, videoEl, px, py) {
-        const ZOOM = 3; const RADIUS = 60;
-        let lx = px; let ly = py - 90; 
-        if (ly - RADIUS < 0) ly = py + 90; 
+        const ZOOM = 3; 
+        const RADIUS = 90; // 加大半徑 (從 60 變成 90)
+        let lx = px; 
+        let ly = py - 130; // 提高 Y 軸偏移量
+        
+        if (ly - RADIUS < 0) ly = py + 130; 
         if (lx - RADIUS < 0) lx = RADIUS;
         if (lx + RADIUS > canvas.width) lx = canvas.width - RADIUS;
 
@@ -462,7 +463,7 @@
             loupePos = { x: snapped.px, y: snapped.py }; 
             if (draggingPoint) {
                 draggingPoint.px = snapped.px; draggingPoint.py = snapped.py;
-                syncCharts(); 
+                // v5.4: 移除拖曳時的即時 syncCharts()，解決 CPU 滿載卡頓問題
             } else if (tempPoint) {
                 tempPoint.px = snapped.px; tempPoint.py = snapped.py;
             }
@@ -479,11 +480,10 @@
             if (calibPoints.length === 2) {
                 setTimeout(() => {
                     const pxDist = Math.hypot(calibPoints[1].px - calibPoints[0].px, calibPoints[1].py - calibPoints[0].py);
-                    // v5.3 單位友善提示
                     const promptStr = currentUnit === 'm' ? "請輸入兩點之間的真實長度 (單位: 公尺):" : "請輸入兩點之間的真實長度 (單位: 公分):";
                     const realDist = prompt(promptStr, "1.0");
                     if (realDist && !isNaN(realDist)) {
-                        physicalScale = parseFloat(realDist) / pxDist; // 這邊的 scale 對應目前選擇的單位
+                        physicalScale = parseFloat(realDist) / pxDist; 
                         statusSpace.innerText = `✅ 比例尺已設定: 1px = ${physicalScale.toFixed(5)} ${currentUnit}`;
                         statusSpace.style.color = "#27ae60";
                     }
@@ -504,9 +504,12 @@
             if (tempPoint) {
                 trackPoints.push({ time: video.currentTime - startTime, px: tempPoint.px, py: tempPoint.py });
                 trackPoints.sort((a, b) => a.time - b.time);
-                tempPoint = null; updateTrackUI(); vidStep(1); 
+                tempPoint = null; 
+                updateTrackUI(); // v5.4: 放開手瞬間才更新圖表
+                vidStep(1); 
             } else if (draggingPoint) {
-                draggingPoint = null; updateTrackUI();
+                draggingPoint = null; 
+                updateTrackUI(); // v5.4: 放開手瞬間才更新圖表
             }
         }
     });
@@ -578,7 +581,7 @@
         if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } 
     }
 
-    /* ================= 4. 圖表與運算引擎 (具備單位切換與強制置中) ================= */
+    /* ================= 4. 圖表與運算引擎 ================= */
     function linearRegression(x, y) {
         let n = x.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
         for (let i = 0; i < n; i++) { sum_x += x[i]; sum_y += y[i]; sum_xy += x[i]*y[i]; sum_xx += x[i]*x[i]; }
@@ -594,7 +597,6 @@
     }
 
     function initCharts() {
-        // v5.3: 設定 x 與 y 軸格線，y=0 軸加粗變深，其餘變淺
         const createChart = (id, title, yAxisLabel) => {
             return new Chart(document.getElementById(id).getContext('2d'), {
                 type: 'scatter',
@@ -676,9 +678,7 @@
     function syncCharts() {
         const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
         
-        // v5.3 強制對稱置中與最小跨距邏輯
         const updateOneChart = (chart, tData, yData, eqElementId, minPoints, labelPrefix) => {
-            // 動態更新 Y 軸單位標籤
             let unitStr = currentUnit;
             if (eqElementId.includes('vx') || eqElementId.includes('vy')) unitStr += '/s';
             else if (eqElementId.includes('ax') || eqElementId.includes('ay')) unitStr += '/s²';
@@ -690,13 +690,12 @@
                 chart.update(); return;
             }
 
-            // 防雜訊震盪：設定圖表顯示的最小範圍 (m 與 cm 的合理極限)
             let minSpan = currentUnit === 'm' ? 0.1 : 10;
             if (eqElementId.includes('vx') || eqElementId.includes('vy')) minSpan = currentUnit === 'm' ? 0.5 : 50;
             if (eqElementId.includes('ax') || eqElementId.includes('ay')) minSpan = currentUnit === 'm' ? 2 : 200;
 
             let maxAbs = Math.max(...yData.map(Math.abs));
-            if (maxAbs < minSpan) maxAbs = minSpan; // 如果數據雜訊極小，鎖定跨度，避免放大誤差
+            if (maxAbs < minSpan) maxAbs = minSpan; 
 
             chart.options.scales.y.min = -maxAbs * 1.1;
             chart.options.scales.y.max = maxAbs * 1.1;
