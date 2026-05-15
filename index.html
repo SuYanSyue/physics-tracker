@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v5.1</title>
+    <title>物理實驗分析平台 v5.2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
@@ -41,7 +41,6 @@
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
-        /* 加入 white-space: nowrap 防止按鈕變兩行 */
         .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; white-space: nowrap; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
@@ -52,7 +51,6 @@
         .action-btn.export { background: #8e44ad; padding: 8px 12px; } 
         select.action-btn { -webkit-appearance: none; text-align: center; font-size: 14px; }
 
-        /* 加入 white-space: nowrap 防止核取方塊被擠壓 */
         .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2c3e50; padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
         .info-label input[type="checkbox"] { transform: scale(1.3); cursor: pointer; margin: 0; }
@@ -69,7 +67,7 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v5.1</div>
+    <div class="version-badge">v5.2</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -96,7 +94,6 @@
 
 <div class="panel" id="main-panel">
     
-    <!-- Step 1: 時間與畫格 -->
     <div class="panel-content active" id="panel-1">
         <div class="grid-row" style="margin-top:0;">
             <input type="file" id="file-upload" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
@@ -115,7 +112,6 @@
         </div>
     </div>
 
-    <!-- Step 2: 空間與校正 -->
     <div class="panel-content" id="panel-2">
         <div class="grid-row" style="margin-top:0;">
             <button class="action-btn origin" id="btn-origin" onclick="setAppMode('AXES')" disabled>1. 設定座標系</button>
@@ -128,14 +124,15 @@
         </div>
     </div>
 
-    <!-- Step 3: 標記與圖表 -->
     <div class="panel-content" id="panel-3" style="padding: 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-bottom: 1px solid #ddd; position: sticky; top: 45px; z-index: 99;">
+        <!-- 第三步狀態列：新增防護鎖定按鈕 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-bottom: 1px solid #ddd; position: sticky; top: 45px; z-index: 99; flex-wrap: wrap; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <span id="track-count" style="font-weight: bold; font-size: 16px; color: var(--primary);">已標記: 0 點</span>
                 <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前: 1 / 共 -- 幀</span>
             </div>
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="action-btn success" id="btn-lock" style="padding: 6px 12px;" onclick="toggleLock()">🔓 未鎖定</button>
                 <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">復原</button>
                 <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">匯出 CSV</button>
                 <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">清除</button>
@@ -169,6 +166,7 @@
     let trackPoints = []; 
     let currentTab = 1;
     let isDraggingSeekbar = false; 
+    let isScreenLocked = false; // v5.2 新增：畫面鎖定狀態
 
     // 物理空間屬性
     let physicalScale = 0.01; 
@@ -214,6 +212,19 @@
         }
         setTimeout(resizeCanvas, 300);
         drawPoints();
+    }
+
+    // 鎖定/解鎖功能
+    function toggleLock() {
+        isScreenLocked = !isScreenLocked;
+        const btnLock = document.getElementById('btn-lock');
+        if (isScreenLocked) {
+            btnLock.innerText = "🔒 已鎖定";
+            btnLock.classList.replace('success', 'danger');
+        } else {
+            btnLock.innerText = "🔓 未鎖定";
+            btnLock.classList.replace('danger', 'success');
+        }
     }
 
     function handleFileUpload(event) {
@@ -339,7 +350,6 @@
         ctx.restore();
     }
 
-    // 計算投影點 (核心鎖定演算法)
     function calculateSnappedPoint(px, py) {
         if (originX === null) return { px: px, py: py };
         
@@ -352,9 +362,7 @@
         let projX = vx * ux_x + vy * ux_y;
         let projY = vx * uy_x + vy * uy_y;
         
-        // 僅沿 x 軸跑 = Y 不會有位移 (projY = 0)
         if (document.getElementById('chk-only-x').checked) projY = 0; 
-        // 僅沿 y 軸跑 = X 不會有位移 (projX = 0)
         if (document.getElementById('chk-only-y').checked) projX = 0; 
         
         return { px: originX + projX * ux_x + projY * uy_x, py: originY + projX * ux_y + projY * uy_y };
@@ -362,6 +370,10 @@
 
     canvas.addEventListener('pointerdown', (e) => {
         if (!e.isPrimary) return; 
+        
+        // v5.2：如果處於標記模式且已鎖定畫面，直接忽略觸控！
+        if (appMode === 'TRACK' && isScreenLocked) return;
+
         const pos = getCanvasPos(e);
 
         if (appMode === 'CALIB') {
@@ -391,7 +403,7 @@
                     if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
                         draggingPoint = trackPoints[i]; 
                         isLoupeActive = true; 
-                        loupePos = { x: draggingPoint.px, y: draggingPoint.py }; // 修復：確保放大鏡在正確位置
+                        loupePos = { x: draggingPoint.px, y: draggingPoint.py }; 
                         drawPoints(); return;
                     }
                 }
@@ -402,7 +414,7 @@
             
             tempPoint = calculateSnappedPoint(pos.x, pos.y);
             isLoupeActive = true; 
-            loupePos = { x: tempPoint.px, y: tempPoint.py }; // 修復：放大鏡顯示的是吸附後的目標點
+            loupePos = { x: tempPoint.px, y: tempPoint.py }; 
             drawPoints(); 
         }
     });
@@ -433,7 +445,7 @@
             loupePos = { x: pos.x, y: pos.y };
         } else if (appMode === 'TRACK') {
             let snapped = calculateSnappedPoint(pos.x, pos.y);
-            loupePos = { x: snapped.px, y: snapped.py }; // 修復：放大鏡平滑跟隨吸附點
+            loupePos = { x: snapped.px, y: snapped.py }; 
             if (draggingPoint) {
                 draggingPoint.px = snapped.px; draggingPoint.py = snapped.py;
                 syncCharts(); 
@@ -483,7 +495,10 @@
         }
     });
 
-    function undoPoint() { if (trackPoints.length > 0) { trackPoints.pop(); vidStep(-1); updateTrackUI(); } }
+    function undoPoint() { 
+        if (isScreenLocked) return; // 鎖定時無法復原
+        if (trackPoints.length > 0) { trackPoints.pop(); vidStep(-1); updateTrackUI(); } 
+    }
 
     function drawArrow(ctx, fx, fy, tx, ty, color, label) {
         ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
@@ -500,26 +515,22 @@
     function drawPoints() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 升級版座標軸顯示 (高對比度、加粗)
         if (originX !== null && originY !== null && (appMode === 'AXES' || currentTab === 3)) {
             ctx.save();
-            let opacity = appMode === 'AXES' ? 1.0 : 0.6; // 平時也很清楚，設定時更是極度鮮豔
+            let opacity = appMode === 'AXES' ? 1.0 : 0.6; 
             
-            // X 軸 (鮮紅色)
             let cx = Math.cos(angleX), cy = Math.sin(angleX);
             ctx.beginPath(); ctx.moveTo(originX - cx * 2000, originY - cy * 2000); ctx.lineTo(originX + cx * 2000, originY + cy * 2000);
             ctx.strokeStyle = `rgba(255, 60, 60, ${opacity})`; ctx.lineWidth = 2.5; ctx.stroke();
             drawArrow(ctx, originX, originY, originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, `rgba(255, 60, 60, ${opacity})`, 'X');
             if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, 18, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 60, 60, 0.4)'; ctx.fill(); }
 
-            // Y 軸 (亮綠色)
             let yx = Math.cos(angleY), yy = Math.sin(angleY);
             ctx.beginPath(); ctx.moveTo(originX - yx * 2000, originY - yy * 2000); ctx.lineTo(originX + yx * 2000, originY + yy * 2000);
             ctx.strokeStyle = `rgba(50, 255, 50, ${opacity})`; ctx.lineWidth = 2.5; ctx.stroke();
             drawArrow(ctx, originX, originY, originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, `rgba(50, 255, 50, ${opacity})`, 'Y');
             if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, 18, 0, Math.PI*2); ctx.fillStyle = 'rgba(50, 255, 50, 0.4)'; ctx.fill(); }
 
-            // 原點 (天藍色)
             ctx.beginPath(); ctx.arc(originX, originY, 8, 0, Math.PI*2); ctx.fillStyle = `rgba(52,152,219,${opacity})`; ctx.fill();
             ctx.restore();
         }
@@ -546,7 +557,10 @@
     }
 
     function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
-    function clearPoints() { if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
+    function clearPoints() { 
+        if (isScreenLocked) { alert("請先解除鎖定才能清除資料！"); return; }
+        if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } 
+    }
 
     /* ================= 4. 圖表與運算引擎 ================= */
     function linearRegression(x, y) {
@@ -574,7 +588,11 @@
                 options: { 
                     responsive: true, maintainAspectRatio: false,
                     plugins: { title: { display: true, text: title, font: { size: 14 } }, legend: { display: false } },
-                    scales: { x: { type: 'linear', title: { display: true, text: '真實時間 t (s)' } }, y: { title: { display: true, text: yAxisLabel } } },
+                    scales: { 
+                        x: { type: 'linear', title: { display: true, text: '真實時間 t (s)' } }, 
+                        // v5.2 強制讓 Y 軸包含 0，讓常數圖形(如等速度)在視覺上能呈現穩定的水平線
+                        y: { beginAtZero: true, title: { display: true, text: yAxisLabel } } 
+                    },
                     animation: { duration: 0 } 
                 }
             });
