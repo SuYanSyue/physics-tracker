@@ -3,29 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 - 慢動作支援版</title>
+    <title>物理實驗分析平台 - 放大鏡精準版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
         
-        /* 全域設定 */
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
         body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
         
-        /* 吸頂標籤列 */
         .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
         .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
         
-        /* 影片工作區 */
         #workspace-container { flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; }
-        /* 第三步時：佔據螢幕 80% 高度，方便縱向與橫向擁有最大視野 */
         body.step3-active #workspace-container { height: 80vh; flex: none; border-bottom: 3px solid #bdc3c7; }
         
         video, canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
         canvas { z-index: 10; cursor: crosshair; }
 
-        /* 播放器控制列 */
         .player-bar { display: none; align-items: center; padding: 10px 15px; background: #fff; border-bottom: 1px solid #ddd; gap: 10px; height: 45px; box-sizing: border-box; }
         body.step3-active .player-bar { display: none !important; }
         
@@ -36,14 +31,12 @@
         input[type="range"] { width: 100%; height: 6px; cursor: pointer; }
         .time-display { font-family: monospace; font-size: 15px; width: 65px; text-align: right; font-weight: bold; color: var(--primary); }
 
-        /* 控制面板區 */
         .panel { background: white; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
         body.step3-active .panel { background: transparent; box-shadow: none; padding-bottom: 40px; }
         
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
-        /* 按鈕與標籤設計 */
         .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
@@ -57,10 +50,8 @@
         .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #2c3e50; padding: 10px; text-align: center; display: flex; align-items: center; justify-content: center; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
 
-        /* 格線排版 */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; }
         
-        /* 第三步圖表區 */
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); min-height: 280px; display: flex; flex-direction: column; }
@@ -97,29 +88,21 @@
 
 <div class="panel" id="main-panel">
     
-    <!-- Step 1 -->
     <div class="panel-content active" id="panel-1">
         <div class="grid-row">
-            <!-- 隱藏的 File Input，利用原生 iOS 行為 -->
             <input type="file" id="file-upload" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
             <button class="action-btn" onclick="document.getElementById('file-upload').click()">📂 匯入 / 📱 拍攝</button>
-            
             <select id="fps-select" class="action-btn">
                 <option value="30">原始幀率: 30 fps</option>
                 <option value="60">原始幀率: 60 fps</option>
                 <option value="120">慢動作: 120 fps</option>
                 <option value="240">慢動作: 240 fps</option>
             </select>
-            
             <button class="action-btn warning" id="btn-calib" onclick="startCalibration()" disabled>📏 設定比例尺</button>
             <div class="info-label" id="scale-txt" style="font-size:12px;">比例: 預設(1px=0.01m)</div>
         </div>
-        <div style="text-align:center; font-size: 13px; color: #7f8c8d; margin-top: 8px;">
-            提示：在 iPad 上點擊「拍攝」，可開啟原生相機並切換至「慢動作」錄影。
-        </div>
     </div>
 
-    <!-- Step 2 -->
     <div class="panel-content" id="panel-2">
         <div class="grid-row">
             <button class="action-btn" onclick="setMark('start')">設為起點畫格</button>
@@ -129,18 +112,22 @@
         </div>
     </div>
 
-    <!-- Step 3 -->
     <div class="panel-content" id="panel-3" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-bottom: 1px solid #ddd; position: sticky; top: 45px; z-index: 99;">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <span id="track-count" style="font-weight: bold; font-size: 18px; color: var(--primary);">已標記: 0 點</span>
-                <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前進度: 第 1 幀</span>
+                <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前: 第 1 幀</span>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">↩️ 復原</button>
                 <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">📥 CSV</button>
                 <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">🗑️ 清除</button>
             </div>
+        </div>
+        
+        <!-- 放大鏡提示文字 -->
+        <div style="text-align: center; font-size: 14px; color: #3498db; font-weight: bold; padding: 10px 0;">
+            🔍 提示：雙指可縮放網頁。單指「按住不放」會開啟放大鏡，滑動對準後「放開手指」即完成標記！
         </div>
         
         <div class="chart-grid">
@@ -169,11 +156,16 @@
     let currentTab = 1;
 
     let isDraggingSeekbar = false; 
-    let isPlaying = false;
     let physicalScale = 0.01; 
     let isCalibrating = false;
     let calibPoints = [];
-    const HIT_RADIUS = 25; 
+    const HIT_RADIUS = 30; // 放寬觸控範圍
+
+    // 放大鏡與精準定位狀態
+    let isLoupeActive = false;
+    let loupePos = { x: 0, y: 0 };
+    let tempPoint = null; // 暫存正在標記的新點
+    let draggingPoint = null; // 暫存正在修改的舊點
 
     let chartInstances = {};
 
@@ -202,28 +194,19 @@
         setTimeout(resizeCanvas, 300);
     }
 
-    /* ================= 1. 原生影片匯入與比例尺 ================= */
     function handleFileUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const url = URL.createObjectURL(file);
         video.src = url;
-
         video.onloadedmetadata = () => {
             playerBar.style.display = 'flex';
             document.getElementById('btn-calib').disabled = false;
-            
-            startTime = 0;
-            endTime = video.duration || 100;
+            startTime = 0; endTime = video.duration || 100;
             isStartSet = false; isEndSet = false;
-            document.getElementById('txt-start').innerText = "未設定";
-            document.getElementById('txt-end').innerText = "未設定";
-            
-            seekBar.min = 0;
-            seekBar.max = endTime;
-            resizeCanvas();
-            forceUpdateUI();
+            document.getElementById('txt-start').innerText = "未設定"; document.getElementById('txt-end').innerText = "未設定";
+            seekBar.min = 0; seekBar.max = endTime;
+            resizeCanvas(); forceUpdateUI();
         };
     }
 
@@ -231,13 +214,11 @@
         if (!video.src) return;
         isCalibrating = true; calibPoints = []; video.pause(); 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText("點擊畫面標記參考物的第一個端點", canvas.width/2, canvas.height/2);
+        ctx.fillText("點擊畫面標記參考物的端點", canvas.width/2, canvas.height/2);
     }
 
-    /* ================= 2. 播放器與進度條 ================= */
     function forceUpdateUI() {
         seekBar.value = video.currentTime;
         timeTxt.innerText = video.currentTime.toFixed(3) + "s";
@@ -246,13 +227,11 @@
 
     function updateFrameDisplay() {
         if (currentTab === 3 && isStartSet) {
-            // 計算畫格時，假設播放幀率為 30
             let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
             let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
-            
             let frameNum = Math.round((video.currentTime - startTime) * playbackFPS) + 1;
             if (frameNum < 1) frameNum = 1;
-            frameCountTxt.innerText = `目前進度: 第 ${frameNum} 幀`;
+            frameCountTxt.innerText = `目前: 第 ${frameNum} 幀`;
         }
     }
 
@@ -262,18 +241,14 @@
     seekBar.addEventListener('input', () => { video.currentTime = parseFloat(seekBar.value); timeTxt.innerText = video.currentTime.toFixed(3) + "s"; updateFrameDisplay(); });
 
     function vidTogglePlay() {
-        if (video.paused) { video.play(); isPlaying = true; document.getElementById('btn-play').innerText = "⏸️"; }
-        else { video.pause(); isPlaying = false; document.getElementById('btn-play').innerText = "▶️"; }
+        if (video.paused) { video.play(); document.getElementById('btn-play').innerText = "⏸️"; }
+        else { video.pause(); document.getElementById('btn-play').innerText = "▶️"; }
     }
     
     function vidStep(frames) { 
-        video.pause(); isPlaying = false; 
-        document.getElementById('btn-play').innerText = "▶️"; 
-        
-        // 智慧判斷步進時間：iPhone 慢動作(120/240)播放時預設為 30fps
+        video.pause(); document.getElementById('btn-play').innerText = "▶️"; 
         let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
         let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
-        
         video.currentTime += frames * (1 / playbackFPS); 
         forceUpdateUI(); 
     }
@@ -283,27 +258,77 @@
 
     function setMark(type) {
         if (type === 'start') {
-            startTime = video.currentTime;
-            document.getElementById('txt-start').innerText = `${startTime.toFixed(3)}s`;
+            startTime = video.currentTime; document.getElementById('txt-start').innerText = `${startTime.toFixed(3)}s`;
             seekBar.min = startTime; isStartSet = true;
         } else {
-            endTime = video.currentTime;
-            document.getElementById('txt-end').innerText = `${endTime.toFixed(3)}s`;
+            endTime = video.currentTime; document.getElementById('txt-end').innerText = `${endTime.toFixed(3)}s`;
             seekBar.max = endTime; isEndSet = true;
         }
         if (isStartSet && isEndSet) setTimeout(() => switchTab(3), 600);
     }
 
-    /* ================= 3. 畫布點擊 ================= */
+    /* ================= 3. 放大鏡與畫布觸控核心邏輯 ================= */
     function getCanvasPos(e) {
         const rect = canvas.getBoundingClientRect();
         return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
     }
 
+    // 繪製狙擊手放大鏡 (Loupe)
+    function drawLoupe(ctx, videoEl, px, py) {
+        const ZOOM = 3;
+        const RADIUS = 60;
+        let lx = px;
+        let ly = py - 90; // 預設顯示在手指上方，避免被手指擋住
+        
+        // 邊界防護：如果太靠近上方，放大鏡改顯示在下方
+        if (ly - RADIUS < 0) ly = py + 90; 
+        if (lx - RADIUS < 0) lx = RADIUS;
+        if (lx + RADIUS > canvas.width) lx = canvas.width - RADIUS;
+
+        ctx.save();
+        
+        // 繪製放大鏡外框與陰影
+        ctx.beginPath();
+        ctx.arc(lx, ly, RADIUS, 0, Math.PI * 2);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#fff';
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.clip(); // 限制繪製區域為圓形內部
+
+        ctx.fillStyle = '#000'; ctx.fill();
+
+        // 從影片抓取對應區域並放大繪製
+        const sWidth = (RADIUS * 2) / ZOOM;
+        const sHeight = (RADIUS * 2) / ZOOM;
+        const sx = px - sWidth / 2;
+        const sy = py - sHeight / 2;
+        ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, lx - RADIUS, ly - RADIUS, RADIUS * 2, RADIUS * 2);
+
+        // 繪製高精度十字準心
+        ctx.beginPath();
+        ctx.moveTo(lx - RADIUS, ly); ctx.lineTo(lx + RADIUS, ly);
+        ctx.moveTo(lx, ly - RADIUS); ctx.lineTo(lx, ly + RADIUS);
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#e74c3c'; ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 當手指/滑鼠 按下時
     canvas.addEventListener('pointerdown', (e) => {
+        // 【核心保護】：如果不是主要觸控點（例如第二隻手指），直接忽略！支援雙指縮放網頁！
+        if (!e.isPrimary) return; 
+        
         const pos = getCanvasPos(e);
 
         if (isCalibrating) {
+            // 校正功能保持簡單點擊
             if (calibPoints.length === 0) ctx.clearRect(0, 0, canvas.width, canvas.height); 
             calibPoints.push(pos);
             ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
@@ -325,14 +350,64 @@
 
         if (currentTab !== 3) return; 
 
+        // 檢查是否點擊到舊點 (進入修改模式)
+        for (let i = 0; i < trackPoints.length; i++) {
+            if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
+                draggingPoint = trackPoints[i]; 
+                video.currentTime = draggingPoint.time + startTime; 
+                forceUpdateUI(); 
+                
+                // 啟動放大鏡
+                isLoupeActive = true; loupePos = pos;
+                drawPoints();
+                return;
+            }
+        }
+
+        // 沒點到舊點 -> 準備建立新點
         const t = video.currentTime;
         if (t > endTime || t < startTime) return;
         
-        // 儲存影片時間，繪圖與 CSV 匯出時再轉換為真實物理時間
-        trackPoints.push({ time: t - startTime, px: pos.x, py: pos.y });
+        tempPoint = { px: pos.x, py: pos.y }; // 暫存，等待放開手指才寫入
+        isLoupeActive = true; loupePos = pos;
+        drawPoints(); 
+    });
+
+    // 當手指/滑鼠 拖曳時
+    canvas.addEventListener('pointermove', (e) => {
+        if (!e.isPrimary || !isLoupeActive) return;
+        const pos = getCanvasPos(e);
+        loupePos = pos; // 更新放大鏡位置
         
-        updateTrackUI();
-        vidStep(1); 
+        if (draggingPoint) {
+            draggingPoint.px = pos.x; 
+            draggingPoint.py = pos.y;
+            syncCharts(); // 修改舊點時，圖表即時跳動！
+        } else if (tempPoint) {
+            tempPoint.px = pos.x;
+            tempPoint.py = pos.y;
+        }
+        drawPoints();
+    });
+
+    // 當手指/滑鼠 放開時 (確認寫入)
+    window.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary || !isLoupeActive) return;
+        isLoupeActive = false;
+        
+        if (tempPoint) {
+            // 正式寫入新標記點
+            const t = video.currentTime;
+            trackPoints.push({ time: t - startTime, px: tempPoint.px, py: tempPoint.py });
+            trackPoints.sort((a, b) => a.time - b.time);
+            tempPoint = null;
+            updateTrackUI();
+            vidStep(1); // 自動前進一幀
+        } else if (draggingPoint) {
+            // 結束修改模式
+            draggingPoint = null;
+            updateTrackUI();
+        }
     });
 
     function undoPoint() {
@@ -343,12 +418,24 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (currentTab !== 3) return;
 
+        // 繪製所有確認的點
         ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
         trackPoints.forEach((p, i) => {
-            ctx.fillStyle = 'rgba(231, 76, 60, 0.4)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(p.px, p.py, 5, 0, Math.PI*2); ctx.fill();
             if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
         });
+        
+        // 繪製暫存點 (正在拖曳的新點，顯示為綠色)
+        if (tempPoint) {
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.4)'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill();
+        }
+
+        // 繪製狙擊手放大鏡
+        if (isLoupeActive) {
+            drawLoupe(ctx, video, loupePos.x, loupePos.y);
+        }
     }
 
     function updateTrackUI() { 
@@ -360,7 +447,7 @@
         if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } 
     }
 
-    /* ================= 4. 圖表與物理計算核心 ================= */
+    /* ================= 4. 圖表與運算系統 ================= */
     function linearRegression(x, y) {
         let n = x.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
         for (let i = 0; i < n; i++) { sum_x += x[i]; sum_y += y[i]; sum_xy += x[i]*y[i]; sum_xx += x[i]*x[i]; }
@@ -404,16 +491,13 @@
 
     function getPhysicsData() {
         let t=[], x=[], y=[], vx=[], vy=[], ax=[], ay=[];
-        
-        // 【核心演算法】校正慢動作影片的真實時間
         let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
         let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
-        let timeScale = playbackFPS / targetFPS; // 若拍攝240fps，播放30fps，則真實時間 = 影片時間 * (30/240)
+        let timeScale = playbackFPS / targetFPS; 
         
         for (let i = 0; i < trackPoints.length; i++) {
             let realTime = trackPoints[i].time * timeScale;
             t.push(realTime); 
-            
             x.push(trackPoints[i].px * physicalScale);
             y.push((canvas.height - trackPoints[i].py) * physicalScale); 
             
