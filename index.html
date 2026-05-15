@@ -3,24 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 - 放大鏡精準版</title>
+    <title>物理實驗分析平台 - 慢動作與放大鏡精準版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
         
+        /* 全域設定 */
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
         body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
         
+        /* 吸頂標籤列 */
         .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
         .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
         
-        #workspace-container { flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; }
+        /* 影片工作區 */
+        #workspace-container { 
+            flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; 
+            /* 👇 蘋果專屬封印魔法：關閉 iOS 長按選單 👇 */
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none;   
+            user-select: none; 
+        }
+        /* 第三步時：佔據螢幕 80% 高度 */
         body.step3-active #workspace-container { height: 80vh; flex: none; border-bottom: 3px solid #bdc3c7; }
         
         video, canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
-        canvas { z-index: 10; cursor: crosshair; }
+        
+        canvas { 
+            z-index: 10; cursor: crosshair; 
+            /* 👇 畫布層也加上保險 👇 */
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none; 
+            user-select: none; 
+        }
 
+        /* 播放器控制列 */
         .player-bar { display: none; align-items: center; padding: 10px 15px; background: #fff; border-bottom: 1px solid #ddd; gap: 10px; height: 45px; box-sizing: border-box; }
         body.step3-active .player-bar { display: none !important; }
         
@@ -31,12 +49,14 @@
         input[type="range"] { width: 100%; height: 6px; cursor: pointer; }
         .time-display { font-family: monospace; font-size: 15px; width: 65px; text-align: right; font-weight: bold; color: var(--primary); }
 
+        /* 控制面板區 */
         .panel { background: white; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
         body.step3-active .panel { background: transparent; box-shadow: none; padding-bottom: 40px; }
         
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
+        /* 按鈕與標籤設計 */
         .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
@@ -50,8 +70,10 @@
         .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #2c3e50; padding: 10px; text-align: center; display: flex; align-items: center; justify-content: center; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
 
+        /* 格線排版 */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; }
         
+        /* 第三步圖表區 */
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); min-height: 280px; display: flex; flex-direction: column; }
@@ -156,6 +178,7 @@
     let currentTab = 1;
 
     let isDraggingSeekbar = false; 
+    let isPlaying = false;
     let physicalScale = 0.01; 
     let isCalibrating = false;
     let calibPoints = [];
@@ -164,8 +187,8 @@
     // 放大鏡與精準定位狀態
     let isLoupeActive = false;
     let loupePos = { x: 0, y: 0 };
-    let tempPoint = null; // 暫存正在標記的新點
-    let draggingPoint = null; // 暫存正在修改的舊點
+    let tempPoint = null; 
+    let draggingPoint = null; 
 
     let chartInstances = {};
 
@@ -216,7 +239,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText("點擊畫面標記參考物的端點", canvas.width/2, canvas.height/2);
+        ctx.fillText("點擊畫面標記參考物的第一個端點", canvas.width/2, canvas.height/2);
     }
 
     function forceUpdateUI() {
@@ -273,21 +296,18 @@
         return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
     }
 
-    // 繪製狙擊手放大鏡 (Loupe)
     function drawLoupe(ctx, videoEl, px, py) {
         const ZOOM = 3;
         const RADIUS = 60;
         let lx = px;
-        let ly = py - 90; // 預設顯示在手指上方，避免被手指擋住
+        let ly = py - 90; 
         
-        // 邊界防護：如果太靠近上方，放大鏡改顯示在下方
         if (ly - RADIUS < 0) ly = py + 90; 
         if (lx - RADIUS < 0) lx = RADIUS;
         if (lx + RADIUS > canvas.width) lx = canvas.width - RADIUS;
 
         ctx.save();
         
-        // 繪製放大鏡外框與陰影
         ctx.beginPath();
         ctx.arc(lx, ly, RADIUS, 0, Math.PI * 2);
         ctx.lineWidth = 4;
@@ -295,18 +315,16 @@
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 10;
         ctx.stroke();
-        ctx.clip(); // 限制繪製區域為圓形內部
+        ctx.clip(); 
 
         ctx.fillStyle = '#000'; ctx.fill();
 
-        // 從影片抓取對應區域並放大繪製
         const sWidth = (RADIUS * 2) / ZOOM;
         const sHeight = (RADIUS * 2) / ZOOM;
         const sx = px - sWidth / 2;
         const sy = py - sHeight / 2;
         ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, lx - RADIUS, ly - RADIUS, RADIUS * 2, RADIUS * 2);
 
-        // 繪製高精度十字準心
         ctx.beginPath();
         ctx.moveTo(lx - RADIUS, ly); ctx.lineTo(lx + RADIUS, ly);
         ctx.moveTo(lx, ly - RADIUS); ctx.lineTo(lx, ly + RADIUS);
@@ -320,15 +338,12 @@
         ctx.restore();
     }
 
-    // 當手指/滑鼠 按下時
     canvas.addEventListener('pointerdown', (e) => {
-        // 【核心保護】：如果不是主要觸控點（例如第二隻手指），直接忽略！支援雙指縮放網頁！
         if (!e.isPrimary) return; 
         
         const pos = getCanvasPos(e);
 
         if (isCalibrating) {
-            // 校正功能保持簡單點擊
             if (calibPoints.length === 0) ctx.clearRect(0, 0, canvas.width, canvas.height); 
             calibPoints.push(pos);
             ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
@@ -350,39 +365,35 @@
 
         if (currentTab !== 3) return; 
 
-        // 檢查是否點擊到舊點 (進入修改模式)
         for (let i = 0; i < trackPoints.length; i++) {
             if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
                 draggingPoint = trackPoints[i]; 
                 video.currentTime = draggingPoint.time + startTime; 
                 forceUpdateUI(); 
                 
-                // 啟動放大鏡
                 isLoupeActive = true; loupePos = pos;
                 drawPoints();
                 return;
             }
         }
 
-        // 沒點到舊點 -> 準備建立新點
         const t = video.currentTime;
         if (t > endTime || t < startTime) return;
         
-        tempPoint = { px: pos.x, py: pos.y }; // 暫存，等待放開手指才寫入
+        tempPoint = { px: pos.x, py: pos.y }; 
         isLoupeActive = true; loupePos = pos;
         drawPoints(); 
     });
 
-    // 當手指/滑鼠 拖曳時
     canvas.addEventListener('pointermove', (e) => {
         if (!e.isPrimary || !isLoupeActive) return;
         const pos = getCanvasPos(e);
-        loupePos = pos; // 更新放大鏡位置
+        loupePos = pos; 
         
         if (draggingPoint) {
             draggingPoint.px = pos.x; 
             draggingPoint.py = pos.y;
-            syncCharts(); // 修改舊點時，圖表即時跳動！
+            syncCharts(); 
         } else if (tempPoint) {
             tempPoint.px = pos.x;
             tempPoint.py = pos.y;
@@ -390,21 +401,18 @@
         drawPoints();
     });
 
-    // 當手指/滑鼠 放開時 (確認寫入)
     window.addEventListener('pointerup', (e) => {
         if (!e.isPrimary || !isLoupeActive) return;
         isLoupeActive = false;
         
         if (tempPoint) {
-            // 正式寫入新標記點
             const t = video.currentTime;
             trackPoints.push({ time: t - startTime, px: tempPoint.px, py: tempPoint.py });
             trackPoints.sort((a, b) => a.time - b.time);
             tempPoint = null;
             updateTrackUI();
-            vidStep(1); // 自動前進一幀
+            vidStep(1); 
         } else if (draggingPoint) {
-            // 結束修改模式
             draggingPoint = null;
             updateTrackUI();
         }
@@ -418,7 +426,6 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (currentTab !== 3) return;
 
-        // 繪製所有確認的點
         ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
         trackPoints.forEach((p, i) => {
             ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
@@ -426,13 +433,11 @@
             if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
         });
         
-        // 繪製暫存點 (正在拖曳的新點，顯示為綠色)
         if (tempPoint) {
             ctx.fillStyle = 'rgba(46, 204, 113, 0.4)'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 15, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill();
         }
 
-        // 繪製狙擊手放大鏡
         if (isLoupeActive) {
             drawLoupe(ctx, video, loupePos.x, loupePos.y);
         }
