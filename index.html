@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 - 慢動作與放大鏡精準版</title>
+    <title>物理實驗分析平台 v3.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
@@ -12,31 +12,21 @@
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
         body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
         
-        /* 吸頂標籤列 */
+        /* 吸頂標籤列 - 加入 v3.0 標示 */
         .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .version-badge { background: #e74c3c; color: white; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-right: 10px; margin-left: 10px; align-self: center; }
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
         .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
         
-        /* 影片工作區 */
+        /* 影片工作區 (加入蘋果長按封印魔法) */
         #workspace-container { 
             flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; 
-            /* 👇 蘋果專屬封印魔法：關閉 iOS 長按選單 👇 */
-            -webkit-touch-callout: none; 
-            -webkit-user-select: none;   
-            user-select: none; 
+            -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; 
         }
-        /* 第三步時：佔據螢幕 80% 高度 */
         body.step3-active #workspace-container { height: 80vh; flex: none; border-bottom: 3px solid #bdc3c7; }
         
         video, canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
-        
-        canvas { 
-            z-index: 10; cursor: crosshair; 
-            /* 👇 畫布層也加上保險 👇 */
-            -webkit-touch-callout: none; 
-            -webkit-user-select: none; 
-            user-select: none; 
-        }
+        canvas { z-index: 10; cursor: crosshair; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
         /* 播放器控制列 */
         .player-bar { display: none; align-items: center; padding: 10px 15px; background: #fff; border-bottom: 1px solid #ddd; gap: 10px; height: 45px; box-sizing: border-box; }
@@ -56,7 +46,7 @@
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
-        /* 按鈕與標籤設計 */
+        /* 按鈕設計 */
         .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
@@ -64,16 +54,14 @@
         .action-btn.danger { background: #e74c3c; }
         .action-btn.warning { background: #f39c12; }
         .action-btn.export { background: #8e44ad; } 
-        
         select.action-btn { -webkit-appearance: none; text-align: center; font-size: 14px; }
 
         .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #2c3e50; padding: 10px; text-align: center; display: flex; align-items: center; justify-content: center; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
 
-        /* 格線排版 */
         .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; }
         
-        /* 第三步圖表區 */
+        /* 圖表區 */
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); min-height: 280px; display: flex; flex-direction: column; }
@@ -84,9 +72,10 @@
 <body>
 
 <div class="tabs">
-    <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 影片來源與比例尺</div>
+    <div class="version-badge">v3.0</div>
+    <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 影片與比例</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 擷取區間</div>
-    <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與即時圖表</div>
+    <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
 </div>
 
 <div id="workspace-container">
@@ -147,9 +136,8 @@
             </div>
         </div>
         
-        <!-- 放大鏡提示文字 -->
         <div style="text-align: center; font-size: 14px; color: #3498db; font-weight: bold; padding: 10px 0;">
-            🔍 提示：雙指可縮放網頁。單指「按住不放」會開啟放大鏡，滑動對準後「放開手指」即完成標記！
+            🔍 提示：單指「按住不放」開啟放大鏡，對準後「放開」即標記。需退回該畫格才可修改舊點。
         </div>
         
         <div class="chart-grid">
@@ -182,7 +170,7 @@
     let physicalScale = 0.01; 
     let isCalibrating = false;
     let calibPoints = [];
-    const HIT_RADIUS = 30; // 放寬觸控範圍
+    const HIT_RADIUS = 30; 
 
     // 放大鏡與精準定位狀態
     let isLoupeActive = false;
@@ -297,50 +285,32 @@
     }
 
     function drawLoupe(ctx, videoEl, px, py) {
-        const ZOOM = 3;
-        const RADIUS = 60;
-        let lx = px;
-        let ly = py - 90; 
-        
+        const ZOOM = 3; const RADIUS = 60;
+        let lx = px; let ly = py - 90; 
         if (ly - RADIUS < 0) ly = py + 90; 
         if (lx - RADIUS < 0) lx = RADIUS;
         if (lx + RADIUS > canvas.width) lx = canvas.width - RADIUS;
 
         ctx.save();
-        
-        ctx.beginPath();
-        ctx.arc(lx, ly, RADIUS, 0, Math.PI * 2);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#fff';
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 10;
-        ctx.stroke();
-        ctx.clip(); 
-
+        ctx.beginPath(); ctx.arc(lx, ly, RADIUS, 0, Math.PI * 2);
+        ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10;
+        ctx.stroke(); ctx.clip(); 
         ctx.fillStyle = '#000'; ctx.fill();
 
-        const sWidth = (RADIUS * 2) / ZOOM;
-        const sHeight = (RADIUS * 2) / ZOOM;
-        const sx = px - sWidth / 2;
-        const sy = py - sHeight / 2;
+        const sWidth = (RADIUS * 2) / ZOOM; const sHeight = (RADIUS * 2) / ZOOM;
+        const sx = px - sWidth / 2; const sy = py - sHeight / 2;
         ctx.drawImage(videoEl, sx, sy, sWidth, sHeight, lx - RADIUS, ly - RADIUS, RADIUS * 2, RADIUS * 2);
 
-        ctx.beginPath();
-        ctx.moveTo(lx - RADIUS, ly); ctx.lineTo(lx + RADIUS, ly);
+        ctx.beginPath(); ctx.moveTo(lx - RADIUS, ly); ctx.lineTo(lx + RADIUS, ly);
         ctx.moveTo(lx, ly - RADIUS); ctx.lineTo(lx, ly + RADIUS);
-        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
         
-        ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI * 2);
-        ctx.fillStyle = '#e74c3c'; ctx.fill();
-
+        ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI * 2); ctx.fillStyle = '#e74c3c'; ctx.fill();
         ctx.restore();
     }
 
     canvas.addEventListener('pointerdown', (e) => {
         if (!e.isPrimary) return; 
-        
         const pos = getCanvasPos(e);
 
         if (isCalibrating) {
@@ -365,21 +335,25 @@
 
         if (currentTab !== 3) return; 
 
-        for (let i = 0; i < trackPoints.length; i++) {
-            if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
-                draggingPoint = trackPoints[i]; 
-                video.currentTime = draggingPoint.time + startTime; 
-                forceUpdateUI(); 
-                
-                isLoupeActive = true; loupePos = pos;
-                drawPoints();
-                return;
-            }
-        }
-
         const t = video.currentTime;
         if (t > endTime || t < startTime) return;
+        const relativeTime = t - startTime;
+
+        // 【v3.0 修正】：僅允許拖曳「當下畫格」所對應的標記點！
+        // 避免物體移動緩慢時，誤觸上一幀的點導致影片跳回過去
+        for (let i = 0; i < trackPoints.length; i++) {
+            // 時間誤差在 0.02 秒內才視為同一幀的點
+            if (Math.abs(trackPoints[i].time - relativeTime) < 0.02) {
+                if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
+                    draggingPoint = trackPoints[i]; 
+                    isLoupeActive = true; loupePos = pos;
+                    drawPoints();
+                    return;
+                }
+            }
+        }
         
+        // 若沒有點擊到當下畫格的舊點，一律視為「新增點位」
         tempPoint = { px: pos.x, py: pos.y }; 
         isLoupeActive = true; loupePos = pos;
         drawPoints(); 
@@ -427,12 +401,15 @@
         if (currentTab !== 3) return;
 
         ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+        
+        // 標記已經紀錄的舊點
         trackPoints.forEach((p, i) => {
             ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(p.px, p.py, 5, 0, Math.PI*2); ctx.fill();
             if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
         });
         
+        // 標記正在拖曳的新點
         if (tempPoint) {
             ctx.fillStyle = 'rgba(46, 204, 113, 0.4)'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 15, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill();
