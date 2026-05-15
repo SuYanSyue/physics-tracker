@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v6.3</title>
+    <title>物理實驗分析平台 v7.0 (終極分析版)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/regression/2.0.1/regression.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
         
@@ -71,7 +72,7 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v6.3</div>
+    <div class="version-badge">v7.0</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -148,8 +149,11 @@
                 <div class="chart-header">
                     <span style="font-size: 13px; font-weight: bold; color: var(--primary);">x-t 圖 (X 軸位移)</span>
                     <select id="fit-xt-select" onchange="syncCharts()" style="font-size: 12px; padding: 2px; border-radius: 4px;">
-                        <option value="linear" selected>線性擬合 (等速)</option>
-                        <option value="quad">二次擬合 (等加速)</option>
+                        <option value="linear" selected>線性 (等速)</option>
+                        <option value="quad">二次多項式</option>
+                        <option value="cubic">三次多項式</option>
+                        <option value="exponential">指數擬合</option>
+                        <option value="logarithmic">對數擬合</option>
                     </select>
                 </div>
                 <div class="canvas-container"><canvas id="chartXT"></canvas></div>
@@ -160,8 +164,11 @@
                 <div class="chart-header">
                     <span style="font-size: 13px; font-weight: bold; color: var(--primary);">y-t 圖 (Y 軸位移)</span>
                     <select id="fit-yt-select" onchange="syncCharts()" style="font-size: 12px; padding: 2px; border-radius: 4px;">
-                        <option value="linear">線性擬合 (等速)</option>
-                        <option value="quad" selected>二次擬合 (等加速)</option>
+                        <option value="linear">線性 (等速)</option>
+                        <option value="quad" selected>二次多項式</option>
+                        <option value="cubic">三次多項式</option>
+                        <option value="exponential">指數擬合</option>
+                        <option value="logarithmic">對數擬合</option>
                     </select>
                 </div>
                 <div class="canvas-container"><canvas id="chartYT"></canvas></div>
@@ -181,12 +188,12 @@
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAXT"></canvas></div>
                 <div id="reg-axt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次擬合」。</div>
+                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次多項式」。</div>
             </div>
             <div class="chart-box">
                 <div class="canvas-container"><canvas id="chartAYT"></canvas></div>
                 <div id="reg-ayt" class="reg-eq">需至少 4 點</div>
-                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次擬合」。</div>
+                <div class="reg-note">⚠️ 二次微分雜訊極大，精確加速度請將位移圖設為「二次多項式」。</div>
             </div>
         </div>
     </div>
@@ -507,52 +514,8 @@
     function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
     function clearPoints() { if (isScreenLocked) { alert("請先解除鎖定才能清除資料！"); return; } if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
 
-    /* ================= 4. v6.3: R2 雜訊防呆處理與正名 ================= */
+    /* ================= 4. v7.0: 終極回歸演算法 (使用 regression.js) ================= */
     
-    function linearRegression(xData, yData) {
-        let n = xData.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
-        for (let i = 0; i < n; i++) { sum_x += xData[i]; sum_y += yData[i]; sum_xy += xData[i]*yData[i]; sum_xx += xData[i]*xData[i]; }
-        if(n * sum_xx - sum_x * sum_x === 0) return { m: 0, c: 0, r2: 0 }; 
-        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
-        let intercept = (sum_y - slope * sum_x) / n;
-        let y_mean = sum_y / n, ss_tot = 0, ss_res = 0;
-        for (let i = 0; i < n; i++) {
-            let y_pred = slope * xData[i] + intercept;
-            ss_tot += Math.pow(yData[i] - y_mean, 2); ss_res += Math.pow(yData[i] - y_pred, 2);
-        }
-        // 雜訊濾波閘門：若總變異極小，強制 R2 為 0，避免數學雜訊擬合
-        let r2 = 0;
-        if (ss_tot > 1e-8) { r2 = 1 - (ss_res / ss_tot); }
-        r2 = Math.max(0, Math.min(1, r2)); // 防止極微小的浮點數負值
-        return { m: slope, c: intercept, r2: r2 };
-    }
-
-    function quadraticRegression(xData, yData) {
-        let n = xData.length;
-        if (n < 3) return { A: 0, B: 0, C: 0, r2: 0 };
-        let sx = 0, sx2 = 0, sx3 = 0, sx4 = 0, sy = 0, sxy = 0, sx2y = 0;
-        for (let i = 0; i < n; i++) {
-            let x = xData[i], y = yData[i];
-            sx += x; sx2 += x*x; sx3 += Math.pow(x,3); sx4 += Math.pow(x,4);
-            sy += y; sxy += x*y; sx2y += x*x*y;
-        }
-        let D = sx4*(sx2*n - sx*sx) - sx3*(sx3*n - sx*sx2) + sx2*(sx3*sx - sx2*sx2);
-        if (D === 0) return { A:0, B:0, C:0, r2:0 };
-        let DA = sx2y*(sx2*n - sx*sx) - sx3*(sxy*n - sy*sx) + sx2*(sxy*sx - sy*sx2);
-        let DB = sx4*(sxy*n - sy*sx) - sx2y*(sx3*n - sx*sx2) + sx2*(sx3*sy - sxy*sx2);
-        let DC = sx4*(sx2*sy - sx*sxy) - sx3*(sx3*sy - sx2*sxy) + sx2y*(sx3*sx - sx2*sx2);
-        let A = DA/D, B = DB/D, C = DC/D;
-        let yMean = sy/n, ssTot = 0, ssRes = 0;
-        for (let i = 0; i < n; i++) {
-            let yPred = A*xData[i]*xData[i] + B*xData[i] + C;
-            ssTot += Math.pow(yData[i] - yMean, 2); ssRes += Math.pow(yData[i] - yPred, 2);
-        }
-        let r2 = 0;
-        if (ssTot > 1e-8) { r2 = 1 - (ssRes / ssTot); }
-        r2 = Math.max(0, Math.min(1, r2));
-        return { A, B, C, r2: r2 };
-    }
-
     function initCharts() {
         const createChart = (id, title) => {
             return new Chart(document.getElementById(id).getContext('2d'), {
@@ -572,12 +535,9 @@
                 }
             });
         };
-        chartInstances.xt = createChart('chartXT');
-        chartInstances.yt = createChart('chartYT');
-        chartInstances.vxt = createChart('chartVXT');
-        chartInstances.vyt = createChart('chartVYT');
-        chartInstances.axt = createChart('chartAXT');
-        chartInstances.ayt = createChart('chartAYT');
+        chartInstances.xt = createChart('chartXT'); chartInstances.yt = createChart('chartYT');
+        chartInstances.vxt = createChart('chartVXT'); chartInstances.vyt = createChart('chartVYT');
+        chartInstances.axt = createChart('chartAXT'); chartInstances.ayt = createChart('chartAYT');
     }
     window.addEventListener('load', initCharts);
 
@@ -622,9 +582,11 @@
     function syncCharts() {
         const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
         
-        const updatePosChart = (chart, tData, yData, eqElementId, labelPrefix, fitMode, depVar) => {
-            chart.options.scales.y.title.text = `${labelPrefix} (${currentUnit})`;
-            const minPts = fitMode === 'linear' ? 2 : 3;
+        const updateChartWithRegression = (chart, tData, yData, eqElementId, labelPrefix, fitMode, depVar, isPosChart) => {
+            let unitStr = isPosChart ? currentUnit : (eqElementId.includes('v') ? currentUnit+'/s' : currentUnit+'/s²');
+            chart.options.scales.y.title.text = `${labelPrefix} (${unitStr})`;
+
+            const minPts = fitMode === 'linear' || fitMode === 'exponential' || fitMode === 'logarithmic' ? 2 : (fitMode === 'quad' ? 3 : 4);
 
             if (tData.length < minPts) {
                 chart.data.datasets[0].data = []; chart.data.datasets[1].data = [];
@@ -632,78 +594,96 @@
                 chart.update(); return;
             }
 
-            let minSpan = currentUnit === 'm' ? 0.1 : 10;
-            let maxAbs = Math.max(...yData.map(Math.abs));
-            if (maxAbs < minSpan) maxAbs = minSpan; 
-            chart.options.scales.y.min = -maxAbs * 1.1;
-            chart.options.scales.y.max = maxAbs * 1.1;
-
-            chart.data.datasets[0].data = tData.map((timeVal, idx) => ({ x: timeVal, y: yData[idx] }));
-            
-            let trendData = [];
-            let eqText = "";
-
-            if (fitMode === 'linear') {
-                const reg = linearRegression(tData, yData);
-                trendData = tData.map(timeVal => ({ x: timeVal, y: reg.m * timeVal + reg.c }));
-                eqText = `${depVar} = ${reg.m.toFixed(3)}t ${reg.c >= 0 ? '+' : ''} ${reg.c.toFixed(3)} &nbsp;|&nbsp; R² = ${reg.r2.toFixed(4)}<br>等速度 = <span style="color:#2980b9;font-size:16px;">${reg.m.toFixed(3)}</span> ${currentUnit}/s`;
-                chart.data.datasets[1].tension = 0;
-            } else {
-                const reg = quadraticRegression(tData, yData);
-                if (tData.length > 0) {
-                    let tStart = tData[0], tEnd = tData[tData.length - 1], steps = 50;
-                    for(let i=0; i<=steps; i++) {
-                        let tx = tStart + (tEnd - tStart) * (i/steps);
-                        trendData.push({ x: tx, y: reg.A*tx*tx + reg.B*tx + reg.C });
-                    }
-                }
-                let accel = (reg.A * 2).toFixed(3);
-                eqText = `${depVar} = ${reg.A.toFixed(3)}t² ${reg.B >= 0 ? '+' : ''}${reg.B.toFixed(3)}t ${reg.C >= 0 ? '+' : ''}${reg.C.toFixed(3)} &nbsp;|&nbsp; R² = ${reg.r2.toFixed(4)}<br>等加速度 = <span style="color:#2980b9;font-size:16px;">${accel}</span> ${currentUnit}/s²`;
-                chart.data.datasets[1].tension = 0.4;
+            // 準備 regression.js 格式的資料
+            let dataPairs = [];
+            for (let i = 0; i < tData.length; i++) {
+                if (fitMode === 'logarithmic' && tData[i] <= 0) continue; // 對數不能有小於等於0的輸入
+                dataPairs.push([tData[i], yData[i]]);
             }
 
-            chart.data.datasets[1].data = trendData;
-            document.getElementById(eqElementId).innerHTML = eqText;
-            chart.update();
-        };
-
-        const updateLinearChart = (chart, tData, yData, eqElementId, minPoints, labelPrefix, depVar) => {
-            let unitStr = currentUnit;
-            if (eqElementId.includes('vx') || eqElementId.includes('vy')) unitStr += '/s';
-            else if (eqElementId.includes('ax') || eqElementId.includes('ay')) unitStr += '/s²';
-            chart.options.scales.y.title.text = `${labelPrefix} (${unitStr})`;
-
-            if (tData.length < minPoints) {
-                chart.data.datasets[0].data = []; chart.data.datasets[1].data = [];
-                document.getElementById(eqElementId).innerText = `需至少 ${minPoints} 點`;
+            if (dataPairs.length < minPts) {
+                document.getElementById(eqElementId).innerHTML = `<span style="color:#e74c3c;">數據不足 (可能有零或負值)</span>`;
                 chart.update(); return;
             }
 
+            // 防雜訊震盪：設定圖表顯示的最小範圍
             let minSpan = currentUnit === 'm' ? 0.1 : 10;
-            if (eqElementId.includes('vx') || eqElementId.includes('vy')) minSpan = currentUnit === 'm' ? 0.5 : 50;
-            if (eqElementId.includes('ax') || eqElementId.includes('ay')) minSpan = currentUnit === 'm' ? 2 : 200;
+            if (!isPosChart) minSpan = eqElementId.includes('v') ? (currentUnit === 'm' ? 0.5 : 50) : (currentUnit === 'm' ? 2 : 200);
             let maxAbs = Math.max(...yData.map(Math.abs));
             if (maxAbs < minSpan) maxAbs = minSpan; 
-
             chart.options.scales.y.min = -maxAbs * 1.1;
             chart.options.scales.y.max = maxAbs * 1.1;
 
             chart.data.datasets[0].data = tData.map((timeVal, idx) => ({ x: timeVal, y: yData[idx] }));
-            const reg = linearRegression(tData, yData);
-            chart.data.datasets[1].data = tData.map(timeVal => ({ x: timeVal, y: reg.m * timeVal + reg.c }));
-            document.getElementById(eqElementId).innerHTML = `${depVar} = ${reg.m.toFixed(3)}t ${reg.c >= 0 ? '+' : ''} ${reg.c.toFixed(3)} &nbsp;|&nbsp; R² = ${reg.r2.toFixed(4)}`;
+
+            // 呼叫 regression.js 進行計算
+            const opts = { precision: 5 };
+            let result;
+            try {
+                if (fitMode === 'linear') result = regression.linear(dataPairs, opts);
+                else if (fitMode === 'quad') result = regression.polynomial(dataPairs, { order: 2, precision: 5 });
+                else if (fitMode === 'cubic') result = regression.polynomial(dataPairs, { order: 3, precision: 5 });
+                else if (fitMode === 'exponential') result = regression.exponential(dataPairs, opts);
+                else if (fitMode === 'logarithmic') result = regression.logarithmic(dataPairs, opts);
+            } catch(e) { result = null; }
+
+            // 防呆：如果擬合失敗 (例如數值為負導致對數或指數爆炸)
+            if (!result || isNaN(result.equation[0])) {
+                document.getElementById(eqElementId).innerHTML = `<span style="color:#e74c3c;">該數學模型不適用此數據<br>(可能存在負值或零)</span>`;
+                chart.data.datasets[1].data = []; chart.update(); return;
+            }
+
+            // 教育級防護網：自己計算 R2，保留「極小波動強制歸零」的防呆設計
+            let yMean = yData.reduce((a,b)=>a+b, 0) / yData.length;
+            let ssTot = 0, ssRes = 0;
+            for(let i=0; i<tData.length; i++) {
+                if (fitMode === 'logarithmic' && tData[i] <= 0) continue;
+                ssTot += Math.pow(yData[i] - yMean, 2);
+                ssRes += Math.pow(yData[i] - result.predict(tData[i])[1], 2);
+            }
+            let r2 = 0;
+            if (ssTot > 1e-8) { r2 = 1 - (ssRes / ssTot); }
+            r2 = Math.max(0, Math.min(1, r2));
+
+            // 產生圓滑的趨勢線
+            let trendData = [];
+            if (dataPairs.length > 0) {
+                let tStart = tData[0], tEnd = tData[tData.length - 1], steps = 50;
+                for(let i=0; i<=steps; i++) {
+                    let tx = tStart + (tEnd - tStart) * (i/steps);
+                    if (fitMode === 'logarithmic' && tx <= 0) continue;
+                    trendData.push({ x: tx, y: result.predict(tx)[1] });
+                }
+            }
+
+            // 格式化方程式文字
+            let eqText = result.string.replace(/y =/g, `${depVar} =`).replace(/x/g, 't');
+            eqText += ` &nbsp;|&nbsp; R² = ${r2.toFixed(4)}`;
+            
+            if (fitMode === 'linear') {
+                eqText += `<br>斜率 (速度) = <span style="color:#2980b9;font-size:16px;">${result.equation[0]}</span>`;
+            } else if (fitMode === 'quad') {
+                let accel = (result.equation[0] * 2).toFixed(4); // 二次項係數 x 2 = 加速度
+                eqText += `<br>等加速度 (2A) = <span style="color:#2980b9;font-size:16px;">${accel}</span> ${unitStr}/s`;
+            }
+
+            chart.data.datasets[1].data = trendData;
+            chart.data.datasets[1].tension = (fitMode === 'linear') ? 0 : 0.4;
+            document.getElementById(eqElementId).innerHTML = eqText;
             chart.update();
         };
 
         const fitX = document.getElementById('fit-xt-select').value;
         const fitY = document.getElementById('fit-yt-select').value;
 
-        updatePosChart(chartInstances.xt, t, x, 'reg-xt', 'X 位置', fitX, 'x');
-        updatePosChart(chartInstances.yt, t, y, 'reg-yt', 'Y 位置', fitY, 'y');
-        updateLinearChart(chartInstances.vxt, t.slice(1,-1), vx.slice(1,-1), 'reg-vxt', 3, '速度 v<sub>x</sub>', 'v<sub>x</sub>');
-        updateLinearChart(chartInstances.vyt, t.slice(1,-1), vy.slice(1,-1), 'reg-vyt', 3, '速度 v<sub>y</sub>', 'v<sub>y</sub>');
-        updateLinearChart(chartInstances.axt, t.slice(2,-2), ax.slice(2,-2), 'reg-axt', 4, '加速度 a<sub>x</sub>', 'a<sub>x</sub>');
-        updateLinearChart(chartInstances.ayt, t.slice(2,-2), ay.slice(2,-2), 'reg-ayt', 4, '加速度 a<sub>y</sub>', 'a<sub>y</sub>');
+        updateChartWithRegression(chartInstances.xt, t, x, 'reg-xt', 'X 位置', fitX, 'x', true);
+        updateChartWithRegression(chartInstances.yt, t, y, 'reg-yt', 'Y 位置', fitY, 'y', true);
+        
+        // 速度與加速度固定使用線性擬合，作為輔助參考
+        updateChartWithRegression(chartInstances.vxt, t.slice(1,-1), vx.slice(1,-1), 'reg-vxt', '速度 v<sub>x</sub>', 'linear', 'v<sub>x</sub>', false);
+        updateChartWithRegression(chartInstances.vyt, t.slice(1,-1), vy.slice(1,-1), 'reg-vyt', '速度 v<sub>y</sub>', 'linear', 'v<sub>y</sub>', false);
+        updateChartWithRegression(chartInstances.axt, t.slice(2,-2), ax.slice(2,-2), 'reg-axt', '加速度 a<sub>x</sub>', 'linear', 'a<sub>x</sub>', false);
+        updateChartWithRegression(chartInstances.ayt, t.slice(2,-2), ay.slice(2,-2), 'reg-ayt', '加速度 a<sub>y</sub>', 'linear', 'a<sub>y</sub>', false);
     }
 
     function exportCSV() {
