@@ -3,32 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v3.0</title>
+    <title>物理實驗分析平台 v4.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
         
-        /* 全域設定 */
         body { font-family: -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: none; }
         body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
         
-        /* 吸頂標籤列 - 加入 v3.0 標示 */
         .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         .version-badge { background: #e74c3c; color: white; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-right: 10px; margin-left: 10px; align-self: center; }
         .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
         .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
         
-        /* 影片工作區 (加入蘋果長按封印魔法) */
         #workspace-container { 
-            flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; 
+            flex-grow: 1; min-height: 0; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; transition: 0.3s; 
             -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; 
         }
-        body.step3-active #workspace-container { height: 80vh; flex: none; border-bottom: 3px solid #bdc3c7; }
+        /* 第三步：極致滿版，精準扣除標籤列(45px)與狀態列(約60px) */
+        body.step3-active #workspace-container { height: calc(100vh - 105px); flex: none; border-bottom: 2px solid #bdc3c7; }
         
         video, canvas { position: absolute; max-width: 100%; max-height: 100%; object-fit: contain; }
         canvas { z-index: 10; cursor: crosshair; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
-        /* 播放器控制列 */
         .player-bar { display: none; align-items: center; padding: 10px 15px; background: #fff; border-bottom: 1px solid #ddd; gap: 10px; height: 45px; box-sizing: border-box; }
         body.step3-active .player-bar { display: none !important; }
         
@@ -39,29 +36,28 @@
         input[type="range"] { width: 100%; height: 6px; cursor: pointer; }
         .time-display { font-family: monospace; font-size: 15px; width: 65px; text-align: right; font-weight: bold; color: var(--primary); }
 
-        /* 控制面板區 */
         .panel { background: white; flex-shrink: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 20; padding-bottom: env(safe-area-inset-bottom); }
         body.step3-active .panel { background: transparent; box-shadow: none; padding-bottom: 40px; }
         
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
-        /* 按鈕設計 */
         .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
         .action-btn.success { background: #27ae60; }
         .action-btn.danger { background: #e74c3c; }
         .action-btn.warning { background: #f39c12; }
-        .action-btn.export { background: #8e44ad; } 
+        .action-btn.origin { background: #9b59b6; }
+        .action-btn.export { background: #8e44ad; padding: 8px 12px; } 
         select.action-btn { -webkit-appearance: none; text-align: center; font-size: 14px; }
 
-        .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 15px; font-weight: bold; color: #2c3e50; padding: 10px; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2c3e50; padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
+        .info-label input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
 
-        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; margin-top: 10px; }
         
-        /* 圖表區 */
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-box { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); min-height: 280px; display: flex; flex-direction: column; }
@@ -72,8 +68,8 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v3.0</div>
-    <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 影片與比例</div>
+    <div class="version-badge">v4.0</div>
+    <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 影片與空間設定</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 擷取區間</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
 </div>
@@ -100,7 +96,7 @@
 <div class="panel" id="main-panel">
     
     <div class="panel-content active" id="panel-1">
-        <div class="grid-row">
+        <div class="grid-row" style="margin-top:0;">
             <input type="file" id="file-upload" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
             <button class="action-btn" onclick="document.getElementById('file-upload').click()">📂 匯入 / 📱 拍攝</button>
             <select id="fps-select" class="action-btn">
@@ -109,13 +105,20 @@
                 <option value="120">慢動作: 120 fps</option>
                 <option value="240">慢動作: 240 fps</option>
             </select>
-            <button class="action-btn warning" id="btn-calib" onclick="startCalibration()" disabled>📏 設定比例尺</button>
-            <div class="info-label" id="scale-txt" style="font-size:12px;">比例: 預設(1px=0.01m)</div>
+        </div>
+        <div class="grid-row">
+            <button class="action-btn warning" id="btn-calib" onclick="setAppMode('CALIB')" disabled>📏 1. 設定比例尺</button>
+            <button class="action-btn origin" id="btn-origin" onclick="setAppMode('ORIGIN')" disabled>📍 2. 自訂原點(0,0)</button>
+            <label class="info-label"><input type="checkbox" id="chk-lock-x" onchange="drawPoints()"> 🔒 鎖定 X 軸</label>
+            <label class="info-label"><input type="checkbox" id="chk-y-down" onchange="syncCharts()"> ⬇️ Y軸向下為正</label>
+        </div>
+        <div id="status-msg" style="text-align: center; font-size: 13px; color: #e74c3c; font-weight: bold; margin-top: 8px;">
+            請先匯入影片以解鎖設定。
         </div>
     </div>
 
     <div class="panel-content" id="panel-2">
-        <div class="grid-row">
+        <div class="grid-row" style="margin-top:0;">
             <button class="action-btn" onclick="setMark('start')">設為起點畫格</button>
             <div class="info-label" id="txt-start">未設定</div>
             <button class="action-btn danger" onclick="setMark('end')">設為終點畫格</button>
@@ -126,18 +129,14 @@
     <div class="panel-content" id="panel-3" style="padding: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 12px 15px; border-bottom: 1px solid #ddd; position: sticky; top: 45px; z-index: 99;">
             <div style="display: flex; align-items: center; gap: 15px;">
-                <span id="track-count" style="font-weight: bold; font-size: 18px; color: var(--primary);">已標記: 0 點</span>
-                <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前: 第 1 幀</span>
+                <span id="track-count" style="font-weight: bold; font-size: 16px; color: var(--primary);">已標記: 0 點</span>
+                <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前: 1 / 共 -- 幀</span>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">↩️ 復原</button>
                 <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">📥 CSV</button>
                 <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">🗑️ 清除</button>
             </div>
-        </div>
-        
-        <div style="text-align: center; font-size: 14px; color: #3498db; font-weight: bold; padding: 10px 0;">
-            🔍 提示：單指「按住不放」開啟放大鏡，對準後「放開」即標記。需退回該畫格才可修改舊點。
         </div>
         
         <div class="chart-grid">
@@ -159,24 +158,28 @@
     const timeTxt = document.getElementById('time-txt');
     const playerBar = document.getElementById('player-bar');
     const frameCountTxt = document.getElementById('frame-count');
+    const statusMsg = document.getElementById('status-msg');
     
     let startTime = 0, endTime = 999;
     let isStartSet = false, isEndSet = false;
     let trackPoints = []; 
     let currentTab = 1;
-
     let isDraggingSeekbar = false; 
-    let isPlaying = false;
-    let physicalScale = 0.01; 
-    let isCalibrating = false;
-    let calibPoints = [];
-    const HIT_RADIUS = 30; 
 
-    // 放大鏡與精準定位狀態
+    // 物理空間屬性
+    let physicalScale = 0.01; 
+    let originX = null, originY = null;
+    let calibPoints = [];
+
+    // 狀態機: IDLE, CALIB, ORIGIN, TRACK
+    let appMode = 'IDLE'; 
+
+    // 放大鏡與互動狀態
     let isLoupeActive = false;
     let loupePos = { x: 0, y: 0 };
     let tempPoint = null; 
     let draggingPoint = null; 
+    const HIT_RADIUS = 30; 
 
     let chartInstances = {};
 
@@ -190,6 +193,7 @@
 
     function switchTab(step) {
         currentTab = step;
+        appMode = (step === 3) ? 'TRACK' : 'IDLE';
         document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.panel-content').forEach(el => el.classList.remove('active'));
         document.getElementById(`tab-${step}`).classList.add('active');
@@ -213,23 +217,37 @@
         video.onloadedmetadata = () => {
             playerBar.style.display = 'flex';
             document.getElementById('btn-calib').disabled = false;
+            document.getElementById('btn-origin').disabled = false;
+            statusMsg.innerText = "✅ 影片已載入。請依序設定比例尺與原點。";
+            statusMsg.style.color = "#27ae60";
+            
             startTime = 0; endTime = video.duration || 100;
             isStartSet = false; isEndSet = false;
             document.getElementById('txt-start').innerText = "未設定"; document.getElementById('txt-end').innerText = "未設定";
             seekBar.min = 0; seekBar.max = endTime;
+            
+            // 預設原點在正中央下方
+            originX = video.videoWidth / 2;
+            originY = video.videoHeight;
+
             resizeCanvas(); forceUpdateUI();
         };
     }
 
-    function startCalibration() {
+    function setAppMode(mode) {
         if (!video.src) return;
-        isCalibrating = true; calibPoints = []; video.pause(); 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'white'; ctx.font = '24px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText("點擊畫面標記參考物的第一個端點", canvas.width/2, canvas.height/2);
+        appMode = mode;
+        video.pause(); 
+        if (mode === 'CALIB') {
+            calibPoints = [];
+            statusMsg.innerText = "📏 【比例尺模式】長按並拖曳放大鏡，設定參考物的「兩端」。";
+        } else if (mode === 'ORIGIN') {
+            statusMsg.innerText = "📍 【原點模式】長按並拖曳放大鏡，設定座標軸的「(0,0) 位置」。";
+        }
+        statusMsg.style.color = "#e74c3c";
     }
 
+    /* ================= 播放器與進度顯示 ================= */
     function forceUpdateUI() {
         seekBar.value = video.currentTime;
         timeTxt.innerText = video.currentTime.toFixed(3) + "s";
@@ -237,13 +255,23 @@
     }
 
     function updateFrameDisplay() {
-        if (currentTab === 3 && isStartSet) {
-            let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
-            let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
-            let frameNum = Math.round((video.currentTime - startTime) * playbackFPS) + 1;
+        let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
+        let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
+        
+        let frameNum = 1;
+        if (isStartSet) {
+            frameNum = Math.round((video.currentTime - startTime) * playbackFPS) + 1;
             if (frameNum < 1) frameNum = 1;
-            frameCountTxt.innerText = `目前: 第 ${frameNum} 幀`;
         }
+
+        let totalFrames = "--";
+        if (isStartSet && isEndSet) {
+            totalFrames = Math.round((endTime - startTime) * playbackFPS) + 1;
+        } else if (video.duration) {
+            totalFrames = Math.round(video.duration * playbackFPS);
+        }
+
+        frameCountTxt.innerText = `目前: 第 ${frameNum} 幀 / 共 ${totalFrames} 幀`;
     }
 
     video.addEventListener('timeupdate', () => { if (!isDraggingSeekbar) forceUpdateUI(); });
@@ -255,7 +283,6 @@
         if (video.paused) { video.play(); document.getElementById('btn-play').innerText = "⏸️"; }
         else { video.pause(); document.getElementById('btn-play').innerText = "▶️"; }
     }
-    
     function vidStep(frames) { 
         video.pause(); document.getElementById('btn-play').innerText = "▶️"; 
         let targetFPS = parseInt(document.getElementById('fps-select').value) || 30;
@@ -263,7 +290,6 @@
         video.currentTime += frames * (1 / playbackFPS); 
         forceUpdateUI(); 
     }
-    
     function vidSeekToStart() { video.currentTime = startTime; forceUpdateUI(); }
     function vidSeekToEnd() { video.currentTime = endTime; forceUpdateUI(); }
 
@@ -275,10 +301,11 @@
             endTime = video.currentTime; document.getElementById('txt-end').innerText = `${endTime.toFixed(3)}s`;
             seekBar.max = endTime; isEndSet = true;
         }
+        updateFrameDisplay();
         if (isStartSet && isEndSet) setTimeout(() => switchTab(3), 600);
     }
 
-    /* ================= 3. 放大鏡與畫布觸控核心邏輯 ================= */
+    /* ================= 放大鏡與觸控核心 ================= */
     function getCanvasPos(e) {
         const rect = canvas.getBoundingClientRect();
         return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
@@ -304,7 +331,6 @@
         ctx.beginPath(); ctx.moveTo(lx - RADIUS, ly); ctx.lineTo(lx + RADIUS, ly);
         ctx.moveTo(lx, ly - RADIUS); ctx.lineTo(lx, ly + RADIUS);
         ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
-        
         ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI * 2); ctx.fillStyle = '#e74c3c'; ctx.fill();
         ctx.restore();
     }
@@ -313,64 +339,53 @@
         if (!e.isPrimary) return; 
         const pos = getCanvasPos(e);
 
-        if (isCalibrating) {
-            if (calibPoints.length === 0) ctx.clearRect(0, 0, canvas.width, canvas.height); 
-            calibPoints.push(pos);
-            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI*2); ctx.fill();
-            if (calibPoints.length === 2) {
-                ctx.strokeStyle = '#2ecc71'; ctx.lineWidth = 4;
-                ctx.beginPath(); ctx.moveTo(calibPoints[0].x, calibPoints[0].y); ctx.lineTo(calibPoints[1].x, calibPoints[1].y); ctx.stroke();
-                setTimeout(() => {
-                    const pxDist = Math.hypot(calibPoints[1].x - calibPoints[0].x, calibPoints[1].y - calibPoints[0].y);
-                    const realDist = prompt("請輸入兩點之間的真實物理長度 (公尺):", "1.0");
-                    if (realDist && !isNaN(realDist)) {
-                        physicalScale = parseFloat(realDist) / pxDist;
-                        document.getElementById('scale-txt').innerText = `比例: 1px=${physicalScale.toFixed(4)}m`;
-                    }
-                    isCalibrating = false; ctx.clearRect(0, 0, canvas.width, canvas.height);
-                }, 100);
-            }
+        if (appMode === 'CALIB' || appMode === 'ORIGIN') {
+            tempPoint = { px: pos.x, py: pos.y };
+            isLoupeActive = true; loupePos = pos;
+            drawPoints();
             return;
         }
 
-        if (currentTab !== 3) return; 
-
-        const t = video.currentTime;
-        if (t > endTime || t < startTime) return;
-        const relativeTime = t - startTime;
-
-        // 【v3.0 修正】：僅允許拖曳「當下畫格」所對應的標記點！
-        // 避免物體移動緩慢時，誤觸上一幀的點導致影片跳回過去
-        for (let i = 0; i < trackPoints.length; i++) {
-            // 時間誤差在 0.02 秒內才視為同一幀的點
-            if (Math.abs(trackPoints[i].time - relativeTime) < 0.02) {
-                if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
-                    draggingPoint = trackPoints[i]; 
-                    isLoupeActive = true; loupePos = pos;
-                    drawPoints();
-                    return;
+        if (appMode === 'TRACK') { 
+            for (let i = 0; i < trackPoints.length; i++) {
+                if (Math.abs(trackPoints[i].time - (video.currentTime - startTime)) < 0.02) {
+                    if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
+                        draggingPoint = trackPoints[i]; 
+                        isLoupeActive = true; loupePos = pos;
+                        drawPoints(); return;
+                    }
                 }
             }
+
+            const t = video.currentTime;
+            if (t > endTime || t < startTime) return;
+            
+            tempPoint = { px: pos.x, py: pos.y }; 
+            // 若鎖定 X 軸且原點存在，強制對齊 X
+            if (document.getElementById('chk-lock-x').checked && originX !== null) tempPoint.px = originX;
+            
+            isLoupeActive = true; loupePos = pos;
+            drawPoints(); 
         }
-        
-        // 若沒有點擊到當下畫格的舊點，一律視為「新增點位」
-        tempPoint = { px: pos.x, py: pos.y }; 
-        isLoupeActive = true; loupePos = pos;
-        drawPoints(); 
     });
 
     canvas.addEventListener('pointermove', (e) => {
         if (!e.isPrimary || !isLoupeActive) return;
         const pos = getCanvasPos(e);
-        loupePos = pos; 
+        loupePos = pos; // 放大鏡跟著手指走
         
-        if (draggingPoint) {
-            draggingPoint.px = pos.x; 
-            draggingPoint.py = pos.y;
-            syncCharts(); 
-        } else if (tempPoint) {
-            tempPoint.px = pos.x;
-            tempPoint.py = pos.y;
+        if (appMode === 'CALIB' || appMode === 'ORIGIN') {
+            tempPoint.px = pos.x; tempPoint.py = pos.y;
+        } else if (appMode === 'TRACK') {
+            let targetX = pos.x;
+            if (document.getElementById('chk-lock-x').checked && originX !== null) targetX = originX;
+            
+            if (draggingPoint) {
+                draggingPoint.px = targetX; draggingPoint.py = pos.y;
+                syncCharts(); 
+            } else if (tempPoint) {
+                tempPoint.px = targetX; tempPoint.py = pos.y;
+            }
         }
         drawPoints();
     });
@@ -379,55 +394,83 @@
         if (!e.isPrimary || !isLoupeActive) return;
         isLoupeActive = false;
         
-        if (tempPoint) {
-            const t = video.currentTime;
-            trackPoints.push({ time: t - startTime, px: tempPoint.px, py: tempPoint.py });
-            trackPoints.sort((a, b) => a.time - b.time);
-            tempPoint = null;
-            updateTrackUI();
-            vidStep(1); 
-        } else if (draggingPoint) {
-            draggingPoint = null;
-            updateTrackUI();
+        if (appMode === 'CALIB' && tempPoint) {
+            calibPoints.push(tempPoint); tempPoint = null;
+            if (calibPoints.length === 2) {
+                setTimeout(() => {
+                    const pxDist = Math.hypot(calibPoints[1].px - calibPoints[0].px, calibPoints[1].py - calibPoints[0].py);
+                    const realDist = prompt("請輸入兩點之間的真實物理長度 (公尺):", "1.0");
+                    if (realDist && !isNaN(realDist)) {
+                        physicalScale = parseFloat(realDist) / pxDist;
+                        statusMsg.innerText = `✅ 比例尺已設定: 1px = ${physicalScale.toFixed(5)} m`;
+                        statusMsg.style.color = "#27ae60";
+                    }
+                    appMode = 'IDLE'; drawPoints();
+                }, 100);
+            } else { drawPoints(); }
+            return;
+        }
+
+        if (appMode === 'ORIGIN' && tempPoint) {
+            originX = tempPoint.px; originY = tempPoint.py;
+            tempPoint = null; appMode = 'IDLE';
+            statusMsg.innerText = `✅ 原點已成功設定。`;
+            statusMsg.style.color = "#27ae60";
+            drawPoints(); syncCharts(); return;
+        }
+
+        if (appMode === 'TRACK') {
+            if (tempPoint) {
+                trackPoints.push({ time: video.currentTime - startTime, px: tempPoint.px, py: tempPoint.py });
+                trackPoints.sort((a, b) => a.time - b.time);
+                tempPoint = null; updateTrackUI(); vidStep(1); 
+            } else if (draggingPoint) {
+                draggingPoint = null; updateTrackUI();
+            }
         }
     });
 
-    function undoPoint() {
-        if (trackPoints.length > 0) { trackPoints.pop(); vidStep(-1); updateTrackUI(); }
-    }
+    function undoPoint() { if (trackPoints.length > 0) { trackPoints.pop(); vidStep(-1); updateTrackUI(); } }
 
     function drawPoints() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (currentTab !== 3) return;
 
-        ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
-        
-        // 標記已經紀錄的舊點
-        trackPoints.forEach((p, i) => {
-            ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(p.px, p.py, 5, 0, Math.PI*2); ctx.fill();
-            if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
-        });
-        
-        // 標記正在拖曳的新點
-        if (tempPoint) {
-            ctx.fillStyle = 'rgba(46, 204, 113, 0.4)'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 15, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill();
+        // 繪製座標系 (若已設定原點)
+        if (originX !== null && originY !== null) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(52, 152, 219, 0.6)'; ctx.setLineDash([5, 5]); ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height); ctx.stroke();
+            ctx.beginPath(); ctx.arc(originX, originY, 6, 0, Math.PI*2); ctx.fillStyle = '#3498db'; ctx.fill();
+            ctx.restore();
         }
 
-        if (isLoupeActive) {
-            drawLoupe(ctx, video, loupePos.x, loupePos.y);
+        if (appMode === 'CALIB') {
+            calibPoints.forEach(p => { ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(p.px, p.py, 6, 0, Math.PI*2); ctx.fill(); });
+            if (tempPoint) { ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill(); }
+        } else if (appMode === 'ORIGIN') {
+            if (tempPoint) { ctx.fillStyle = '#9b59b6'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill(); }
         }
+
+        if (currentTab === 3) {
+            ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3;
+            trackPoints.forEach((p, i) => {
+                ctx.fillStyle = 'rgba(231, 76, 60, 0.2)'; ctx.beginPath(); ctx.arc(p.px, p.py, 10, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(p.px, p.py, 5, 0, Math.PI*2); ctx.fill();
+                if (i > 0) { ctx.beginPath(); ctx.moveTo(trackPoints[i-1].px, trackPoints[i-1].py); ctx.lineTo(p.px, p.py); ctx.stroke(); }
+            });
+            
+            if (tempPoint) {
+                ctx.fillStyle = 'rgba(46, 204, 113, 0.4)'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 15, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#2ecc71'; ctx.beginPath(); ctx.arc(tempPoint.px, tempPoint.py, 6, 0, Math.PI*2); ctx.fill();
+            }
+        }
+
+        if (isLoupeActive) drawLoupe(ctx, video, loupePos.x, loupePos.y);
     }
 
-    function updateTrackUI() { 
-        document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; 
-        drawPoints(); syncCharts(); 
-    }
-
-    function clearPoints() { 
-        if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } 
-    }
+    function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
+    function clearPoints() { if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
 
     /* ================= 4. 圖表與運算系統 ================= */
     function linearRegression(x, y) {
@@ -439,8 +482,7 @@
         let y_mean = sum_y / n, ss_tot = 0, ss_res = 0;
         for (let i = 0; i < n; i++) {
             let y_pred = slope * x[i] + intercept;
-            ss_tot += Math.pow(y[i] - y_mean, 2);
-            ss_res += Math.pow(y[i] - y_pred, 2);
+            ss_tot += Math.pow(y[i] - y_mean, 2); ss_res += Math.pow(y[i] - y_pred, 2);
         }
         return { m: slope, c: intercept, r2: 1 - (ss_res / ss_tot) || 0 };
     }
@@ -477,11 +519,17 @@
         let playbackFPS = (targetFPS > 60) ? 30 : targetFPS;
         let timeScale = playbackFPS / targetFPS; 
         
+        // 考慮原點偏移與 Y 軸方向
+        let ox = originX !== null ? originX : 0;
+        let oy = originY !== null ? originY : canvas.height;
+        let ySign = document.getElementById('chk-y-down').checked ? -1 : 1; 
+
         for (let i = 0; i < trackPoints.length; i++) {
             let realTime = trackPoints[i].time * timeScale;
             t.push(realTime); 
-            x.push(trackPoints[i].px * physicalScale);
-            y.push((canvas.height - trackPoints[i].py) * physicalScale); 
+            
+            x.push((trackPoints[i].px - ox) * physicalScale);
+            y.push((oy - trackPoints[i].py) * physicalScale * ySign); 
             
             if (i === 0) {
                 vx.push(0); vy.push(0); ax.push(0); ay.push(0);
@@ -528,26 +576,15 @@
 
     function exportCSV() {
         if (trackPoints.length === 0) { alert("目前沒有數據可匯出！"); return; }
-        
         const { t, x, y, vx, vy, ax, ay } = getPhysicsData();
-        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        csvContent += "Point,Real Time (s),Pixel X,Pixel Y,Real X (m),Real Y (m),Vx (m/s),Vy (m/s),Ax (m/s2),Ay (m/s2)\n";
-
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFFPoint,Real Time (s),Pixel X,Pixel Y,Real X (m),Real Y (m),Vx (m/s),Vy (m/s),Ax (m/s2),Ay (m/s2)\n";
         for (let i = 0; i < trackPoints.length; i++) {
-            let row = [
-                i + 1, t[i].toFixed(5), trackPoints[i].px.toFixed(1), trackPoints[i].py.toFixed(1),
-                x[i].toFixed(4), y[i].toFixed(4), vx[i].toFixed(4), vy[i].toFixed(4), ax[i].toFixed(4), ay[i].toFixed(4)
-            ];
+            let row = [ i + 1, t[i].toFixed(5), trackPoints[i].px.toFixed(1), trackPoints[i].py.toFixed(1), x[i].toFixed(4), y[i].toFixed(4), vx[i].toFixed(4), vy[i].toFixed(4), ax[i].toFixed(4), ay[i].toFixed(4) ];
             csvContent += row.join(",") + "\n";
         }
-
         const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "kinematics_data.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "kinematics_data.csv");
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 </script>
 
