@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>物理實驗分析平台 v5.0</title>
+    <title>物理實驗分析平台 v5.1</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #2c3e50; --active: #3498db; --bg: #ecf0f1; --dark: #1a252f; }
@@ -12,8 +12,8 @@
         body.step3-active { display: block; height: auto; overflow: auto; touch-action: auto; background: #f4f6f8; }
         
         .tabs { display: flex; background: var(--dark); color: white; font-weight: bold; height: 45px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .version-badge { background: #e74c3c; color: white; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-right: 10px; margin-left: 10px; align-self: center; }
-        .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; }
+        .version-badge { background: #e74c3c; color: white; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-right: 10px; margin-left: 10px; align-self: center; white-space: nowrap; }
+        .tab { flex: 1; display: flex; align-items: center; justify-content: center; opacity: 0.5; cursor: pointer; transition: 0.2s; border-bottom: 3px solid transparent; font-size: 15px; white-space: nowrap; }
         .tab.active { opacity: 1; border-bottom-color: #f1c40f; color: #f1c40f; }
         
         #workspace-container { 
@@ -41,7 +41,8 @@
         .panel-content { display: none; padding: 12px 15px; }
         .panel-content.active { display: block; }
         
-        .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; }
+        /* 加入 white-space: nowrap 防止按鈕變兩行 */
+        .action-btn { border: none; border-radius: 6px; background: var(--active); color: white; font-weight: bold; font-size: 15px; padding: 10px 12px; cursor: pointer; transition: 0.1s; text-align: center; white-space: nowrap; }
         .action-btn:active { transform: translateY(1px); }
         .action-btn:disabled { background: #95a5a6; cursor: not-allowed; transform: none; }
         .action-btn.success { background: #27ae60; }
@@ -51,11 +52,12 @@
         .action-btn.export { background: #8e44ad; padding: 8px 12px; } 
         select.action-btn { -webkit-appearance: none; text-align: center; font-size: 14px; }
 
-        .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2c3e50; padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+        /* 加入 white-space: nowrap 防止核取方塊被擠壓 */
+        .info-label { background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 14px; font-weight: bold; color: #2c3e50; padding: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
         .info-label.red { color: #e74c3c; background: #fdf2e9; border-color: #fadbd8; }
-        .info-label input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
+        .info-label input[type="checkbox"] { transform: scale(1.3); cursor: pointer; margin: 0; }
 
-        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: stretch; margin-top: 10px; }
+        .grid-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; align-items: stretch; margin-top: 10px; }
         
         .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; padding: 0 15px; }
         @media (max-width: 800px) { .chart-grid { grid-template-columns: 1fr; } }
@@ -67,7 +69,7 @@
 <body>
 
 <div class="tabs">
-    <div class="version-badge">v5.0</div>
+    <div class="version-badge">v5.1</div>
     <div class="tab active" onclick="switchTab(1)" id="tab-1">1. 時間與畫格</div>
     <div class="tab" onclick="switchTab(2)" id="tab-2">2. 空間與校正</div>
     <div class="tab" onclick="switchTab(3)" id="tab-3">3. 標記與圖表</div>
@@ -98,7 +100,7 @@
     <div class="panel-content active" id="panel-1">
         <div class="grid-row" style="margin-top:0;">
             <input type="file" id="file-upload" accept="video/*" style="display:none;" onchange="handleFileUpload(event)">
-            <button class="action-btn" onclick="document.getElementById('file-upload').click()">📂 匯入 / 📱 拍攝</button>
+            <button class="action-btn" onclick="document.getElementById('file-upload').click()">匯入影片</button>
             <select id="fps-select" class="action-btn" onchange="forceUpdateUI()">
                 <option value="30">原始幀率: 30 fps</option>
                 <option value="60">原始幀率: 60 fps</option>
@@ -116,10 +118,10 @@
     <!-- Step 2: 空間與校正 -->
     <div class="panel-content" id="panel-2">
         <div class="grid-row" style="margin-top:0;">
-            <button class="action-btn origin" id="btn-origin" onclick="setAppMode('AXES')" disabled>📍 1. 旋轉與設定座標系</button>
-            <button class="action-btn warning" id="btn-calib" onclick="setAppMode('CALIB')" disabled>📏 2. 設定長度比例尺</button>
-            <label class="info-label"><input type="checkbox" id="chk-lock-x" onchange="drawPoints()"> 🔒 鎖定 X 座標 (僅沿 Y 跑)</label>
-            <label class="info-label"><input type="checkbox" id="chk-lock-y" onchange="drawPoints()"> 🔒 鎖定 Y 座標 (僅沿 X 跑)</label>
+            <button class="action-btn origin" id="btn-origin" onclick="setAppMode('AXES')" disabled>1. 設定座標系</button>
+            <button class="action-btn warning" id="btn-calib" onclick="setAppMode('CALIB')" disabled>2. 設定比例尺</button>
+            <label class="info-label"><input type="checkbox" id="chk-only-x" onchange="drawPoints()"> 僅沿x軸跑</label>
+            <label class="info-label"><input type="checkbox" id="chk-only-y" onchange="drawPoints()"> 僅沿y軸跑</label>
         </div>
         <div id="status-msg-space" style="text-align: center; font-size: 13px; color: #e74c3c; font-weight: bold; margin-top: 8px;">
             等待空間設定...
@@ -134,9 +136,9 @@
                 <span id="frame-count" style="font-weight: bold; font-size: 14px; color: #e74c3c;">目前: 1 / 共 -- 幀</span>
             </div>
             <div style="display: flex; gap: 8px;">
-                <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">↩️ 復原</button>
-                <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">📥 CSV</button>
-                <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">🗑️ 清除</button>
+                <button class="action-btn warning" style="padding: 6px 12px;" onclick="undoPoint()">復原</button>
+                <button class="action-btn export" style="padding: 6px 12px;" onclick="exportCSV()">匯出 CSV</button>
+                <button class="action-btn danger" style="padding: 6px 12px;" onclick="clearPoints()">清除</button>
             </div>
         </div>
         
@@ -168,24 +170,22 @@
     let currentTab = 1;
     let isDraggingSeekbar = false; 
 
-    // 物理空間屬性 (v5.0 強大旋轉軸心)
+    // 物理空間屬性
     let physicalScale = 0.01; 
     let originX = null, originY = null;
-    let angleX = 0;              // X 軸角度 (預設朝右, 0弧度)
-    let angleY = -Math.PI / 2;   // Y 軸角度 (預設朝上, Canvas中為 -90度)
+    let angleX = 0;              
+    let angleY = -Math.PI / 2;   
     let calibPoints = [];
 
-    // 狀態機: IDLE, CALIB, AXES, TRACK
     let appMode = 'IDLE'; 
 
-    // 放大鏡與互動狀態
     let isLoupeActive = false;
     let loupePos = { x: 0, y: 0 };
     let tempPoint = null; 
     let draggingPoint = null; 
-    let axesDragState = null; // 'ORIGIN', 'X_AXIS', 'Y_AXIS'
+    let axesDragState = null; 
     const HIT_RADIUS = 30; 
-    const HANDLE_DIST = 150; // 座標軸把手距離
+    const HANDLE_DIST = 150; 
 
     let chartInstances = {};
 
@@ -255,7 +255,6 @@
         drawPoints();
     }
 
-    /* ================= 播放器與進度顯示 ================= */
     function forceUpdateUI() {
         seekBar.value = video.currentTime;
         timeTxt.innerText = video.currentTime.toFixed(3) + "s";
@@ -312,7 +311,6 @@
         updateFrameDisplay();
     }
 
-    /* ================= 放大鏡與觸控核心 (包含 v5.0 強大軸向投影) ================= */
     function getCanvasPos(e) {
         const rect = canvas.getBoundingClientRect();
         return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
@@ -341,50 +339,6 @@
         ctx.restore();
     }
 
-    canvas.addEventListener('pointerdown', (e) => {
-        if (!e.isPrimary) return; 
-        const pos = getCanvasPos(e);
-
-        if (appMode === 'CALIB') {
-            tempPoint = { px: pos.x, py: pos.y };
-            isLoupeActive = true; loupePos = pos; drawPoints(); return;
-        }
-
-        if (appMode === 'AXES') {
-            let hx_x = originX + Math.cos(angleX) * HANDLE_DIST;
-            let hy_x = originY + Math.sin(angleX) * HANDLE_DIST;
-            let hx_y = originX + Math.cos(angleY) * HANDLE_DIST;
-            let hy_y = originY + Math.sin(angleY) * HANDLE_DIST;
-
-            if (Math.hypot(pos.x - hx_x, pos.y - hy_x) < 40) { axesDragState = 'AXIS_X'; } 
-            else if (Math.hypot(pos.x - hx_y, pos.y - hy_y) < 40) { axesDragState = 'AXIS_Y'; } 
-            else if (Math.hypot(pos.x - originX, pos.y - originY) < 40) { axesDragState = 'ORIGIN'; } 
-            else { originX = pos.x; originY = pos.y; axesDragState = 'ORIGIN'; } // 點擊空白處直接移動原點
-            
-            isLoupeActive = true; loupePos = pos; drawPoints(); return;
-        }
-
-        if (appMode === 'TRACK') { 
-            for (let i = 0; i < trackPoints.length; i++) {
-                if (Math.abs(trackPoints[i].time - (video.currentTime - startTime)) < 0.02) {
-                    if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
-                        draggingPoint = trackPoints[i]; 
-                        isLoupeActive = true; loupePos = pos;
-                        drawPoints(); return;
-                    }
-                }
-            }
-
-            const t = video.currentTime;
-            if (t > endTime || t < startTime) return;
-            
-            // v5.0 強大鎖定計算：將點位投影到軸線上
-            tempPoint = calculateSnappedPoint(pos.x, pos.y);
-            isLoupeActive = true; loupePos = tempPoint; // 放大鏡跟著被吸附的點
-            drawPoints(); 
-        }
-    });
-
     // 計算投影點 (核心鎖定演算法)
     function calculateSnappedPoint(px, py) {
         if (originX === null) return { px: px, py: py };
@@ -398,26 +352,74 @@
         let projX = vx * ux_x + vy * ux_y;
         let projY = vx * uy_x + vy * uy_y;
         
-        if (document.getElementById('chk-lock-x').checked) projX = 0; // 鎖定 X 座標，點只會在 Y 軸滑動
-        if (document.getElementById('chk-lock-y').checked) projY = 0; // 鎖定 Y 座標，點只會在 X 軸滑動
+        // 僅沿 x 軸跑 = Y 不會有位移 (projY = 0)
+        if (document.getElementById('chk-only-x').checked) projY = 0; 
+        // 僅沿 y 軸跑 = X 不會有位移 (projX = 0)
+        if (document.getElementById('chk-only-y').checked) projX = 0; 
         
         return { px: originX + projX * ux_x + projY * uy_x, py: originY + projX * ux_y + projY * uy_y };
     }
 
+    canvas.addEventListener('pointerdown', (e) => {
+        if (!e.isPrimary) return; 
+        const pos = getCanvasPos(e);
+
+        if (appMode === 'CALIB') {
+            tempPoint = { px: pos.x, py: pos.y };
+            isLoupeActive = true; loupePos = { x: pos.x, y: pos.y }; 
+            drawPoints(); return;
+        }
+
+        if (appMode === 'AXES') {
+            let hx_x = originX + Math.cos(angleX) * HANDLE_DIST;
+            let hy_x = originY + Math.sin(angleX) * HANDLE_DIST;
+            let hx_y = originX + Math.cos(angleY) * HANDLE_DIST;
+            let hy_y = originY + Math.sin(angleY) * HANDLE_DIST;
+
+            if (Math.hypot(pos.x - hx_x, pos.y - hy_x) < 40) { axesDragState = 'AXIS_X'; } 
+            else if (Math.hypot(pos.x - hx_y, pos.y - hy_y) < 40) { axesDragState = 'AXIS_Y'; } 
+            else if (Math.hypot(pos.x - originX, pos.y - originY) < 40) { axesDragState = 'ORIGIN'; } 
+            else { originX = pos.x; originY = pos.y; axesDragState = 'ORIGIN'; } 
+            
+            isLoupeActive = true; loupePos = { x: pos.x, y: pos.y }; 
+            drawPoints(); return;
+        }
+
+        if (appMode === 'TRACK') { 
+            for (let i = 0; i < trackPoints.length; i++) {
+                if (Math.abs(trackPoints[i].time - (video.currentTime - startTime)) < 0.02) {
+                    if (Math.hypot(pos.x - trackPoints[i].px, pos.y - trackPoints[i].py) < HIT_RADIUS) {
+                        draggingPoint = trackPoints[i]; 
+                        isLoupeActive = true; 
+                        loupePos = { x: draggingPoint.px, y: draggingPoint.py }; // 修復：確保放大鏡在正確位置
+                        drawPoints(); return;
+                    }
+                }
+            }
+
+            const t = video.currentTime;
+            if (t > endTime || t < startTime) return;
+            
+            tempPoint = calculateSnappedPoint(pos.x, pos.y);
+            isLoupeActive = true; 
+            loupePos = { x: tempPoint.px, y: tempPoint.py }; // 修復：放大鏡顯示的是吸附後的目標點
+            drawPoints(); 
+        }
+    });
+
     canvas.addEventListener('pointermove', (e) => {
         if (!e.isPrimary || !isLoupeActive) return;
         const pos = getCanvasPos(e);
-        loupePos = pos; 
         
         if (appMode === 'CALIB') {
             tempPoint.px = pos.x; tempPoint.py = pos.y;
+            loupePos = { x: pos.x, y: pos.y };
         } else if (appMode === 'AXES') {
             if (axesDragState === 'ORIGIN') {
                 originX = pos.x; originY = pos.y;
             } else if (axesDragState === 'AXIS_X') {
                 if (Math.hypot(pos.x - originX, pos.y - originY) > 10) {
                     angleX = Math.atan2(pos.y - originY, pos.x - originX);
-                    // 保持正交，並允許翻轉
                     let cross = Math.cos(angleX)*Math.sin(angleY) - Math.sin(angleX)*Math.cos(angleY);
                     if (cross > 0) angleY = angleX + Math.PI/2; else angleY = angleX - Math.PI/2;
                 }
@@ -428,9 +430,10 @@
                     if (cross > 0) angleX = angleY - Math.PI/2; else angleX = angleY + Math.PI/2;
                 }
             }
+            loupePos = { x: pos.x, y: pos.y };
         } else if (appMode === 'TRACK') {
             let snapped = calculateSnappedPoint(pos.x, pos.y);
-            loupePos = snapped; // 放大鏡也要黏在軸線上
+            loupePos = { x: snapped.px, y: snapped.py }; // 修復：放大鏡平滑跟隨吸附點
             if (draggingPoint) {
                 draggingPoint.px = snapped.px; draggingPoint.py = snapped.py;
                 syncCharts(); 
@@ -484,7 +487,7 @@
 
     function drawArrow(ctx, fx, fy, tx, ty, color, label) {
         ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
-        ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.strokeStyle = color; ctx.stroke();
         let a = Math.atan2(ty - fy, tx - fx);
         ctx.beginPath(); ctx.moveTo(tx, ty);
         ctx.lineTo(tx - 15 * Math.cos(a - Math.PI/6), ty - 15 * Math.sin(a - Math.PI/6));
@@ -497,26 +500,26 @@
     function drawPoints() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 繪製強大自由十字座標系
+        // 升級版座標軸顯示 (高對比度、加粗)
         if (originX !== null && originY !== null && (appMode === 'AXES' || currentTab === 3)) {
             ctx.save();
-            let opacity = appMode === 'AXES' ? 0.9 : 0.4; // 標記時半透明不干擾
+            let opacity = appMode === 'AXES' ? 1.0 : 0.6; // 平時也很清楚，設定時更是極度鮮豔
             
-            // X 軸長線與箭頭
+            // X 軸 (鮮紅色)
             let cx = Math.cos(angleX), cy = Math.sin(angleX);
             ctx.beginPath(); ctx.moveTo(originX - cx * 2000, originY - cy * 2000); ctx.lineTo(originX + cx * 2000, originY + cy * 2000);
-            ctx.strokeStyle = `rgba(231,76,60,${opacity*0.5})`; ctx.lineWidth = 1; ctx.stroke();
-            drawArrow(ctx, originX, originY, originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, `rgba(231,76,60,${opacity})`, 'X');
-            if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, 15, 0, Math.PI*2); ctx.fillStyle = 'rgba(231,76,60,0.3)'; ctx.fill(); }
+            ctx.strokeStyle = `rgba(255, 60, 60, ${opacity})`; ctx.lineWidth = 2.5; ctx.stroke();
+            drawArrow(ctx, originX, originY, originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, `rgba(255, 60, 60, ${opacity})`, 'X');
+            if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + cx * HANDLE_DIST, originY + cy * HANDLE_DIST, 18, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 60, 60, 0.4)'; ctx.fill(); }
 
-            // Y 軸長線與箭頭
+            // Y 軸 (亮綠色)
             let yx = Math.cos(angleY), yy = Math.sin(angleY);
             ctx.beginPath(); ctx.moveTo(originX - yx * 2000, originY - yy * 2000); ctx.lineTo(originX + yx * 2000, originY + yy * 2000);
-            ctx.strokeStyle = `rgba(46,204,113,${opacity*0.5})`; ctx.lineWidth = 1; ctx.stroke();
-            drawArrow(ctx, originX, originY, originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, `rgba(46,204,113,${opacity})`, 'Y');
-            if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, 15, 0, Math.PI*2); ctx.fillStyle = 'rgba(46,204,113,0.3)'; ctx.fill(); }
+            ctx.strokeStyle = `rgba(50, 255, 50, ${opacity})`; ctx.lineWidth = 2.5; ctx.stroke();
+            drawArrow(ctx, originX, originY, originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, `rgba(50, 255, 50, ${opacity})`, 'Y');
+            if (appMode === 'AXES') { ctx.beginPath(); ctx.arc(originX + yx * HANDLE_DIST, originY + yy * HANDLE_DIST, 18, 0, Math.PI*2); ctx.fillStyle = 'rgba(50, 255, 50, 0.4)'; ctx.fill(); }
 
-            // 原點
+            // 原點 (天藍色)
             ctx.beginPath(); ctx.arc(originX, originY, 8, 0, Math.PI*2); ctx.fillStyle = `rgba(52,152,219,${opacity})`; ctx.fill();
             ctx.restore();
         }
@@ -545,7 +548,7 @@
     function updateTrackUI() { document.getElementById('track-count').innerText = `已標記: ${trackPoints.length} 點`; drawPoints(); syncCharts(); }
     function clearPoints() { if(confirm('確定清除？')) { trackPoints = []; video.currentTime = startTime; forceUpdateUI(); updateTrackUI(); } }
 
-    /* ================= 4. 圖表與運算引擎 (矩陣投影版) ================= */
+    /* ================= 4. 圖表與運算引擎 ================= */
     function linearRegression(x, y) {
         let n = x.length, sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
         for (let i = 0; i < n; i++) { sum_x += x[i]; sum_y += y[i]; sum_xy += x[i]*y[i]; sum_xx += x[i]*x[i]; }
@@ -601,7 +604,6 @@
             let realTime = trackPoints[i].time * timeScale;
             t.push(realTime); 
             
-            // v5.0: 完美的數學內積投影，將畫面座標轉換為真實物理座標
             let px = trackPoints[i].px - ox;
             let py = trackPoints[i].py - oy;
             
